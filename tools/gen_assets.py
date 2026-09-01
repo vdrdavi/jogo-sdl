@@ -2,7 +2,12 @@
 """Gera os assets placeholder do projeto (texturas, fonte bitmap e sons).
 
 Requer Pillow apenas para gerar as imagens; o jogo em si nao depende de nada
-alem do SDL3. Rode a partir da raiz do projeto:
+alem do SDL3.
+
+O atlas de texto e rasterizado da Liberation Mono, que e distribuida sob a SIL
+Open Font License 1.1 -- veja assets/fonts/README.md antes de trocar a fonte.
+
+Rode a partir da raiz do projeto:
 
     python tools/gen_assets.py
 """
