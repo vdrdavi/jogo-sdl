@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""Gera os assets placeholder do projeto (texturas, fonte bitmap e sons).
+
+Requer Pillow apenas para gerar as imagens; o jogo em si nao depende de nada
+alem do SDL3. Rode a partir da raiz do projeto:
+
+    python tools/gen_assets.py
+"""
+
+from __future__ import annotations
+
+import math
+import struct
+import wave
+from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFont
+
+RAIZ = Path(__file__).resolve().parent.parent
+ASSETS = RAIZ / "assets"
+
+FONTE_SISTEMA = Path("/usr/share/fonts/liberation/LiberationMono-Regular.ttf")
+
+# Espaco e tratado como avanco em branco, entao fica fora do atlas.
+CHARSET = (
+    "!\"#$%&'()*+,-./0123456789:;<=>?"
+    "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
+    "`abcdefghijklmnopqrstuvwxyz{|}~"
+    "ÀÁÂÃÇÉÊÍÓÔÕÚ"
+    "àáâãçéêíóôõú"
+    "°ªº→←↑↓"
+)
+
+
+def gerar_fonte(tamanho_px: int = 16, colunas: int = 16) -> None:
+    if not FONTE_SISTEMA.exists():
+        raise SystemExit(f"fonte nao encontrada: {FONTE_SISTEMA} (instale ttf-liberation)")
+
+    fonte = ImageFont.truetype(str(FONTE_SISTEMA), tamanho_px)
+
+    # A celula precisa caber o glifo mais alto e o descendente mais fundo de
+    # todo o charset; caso contrario um "g" vaza para a celula de baixo no atlas.
+    caixas = [fonte.getbbox(c) for c in CHARSET]
+    topo = min(caixa[1] for caixa in caixas)
+    base = max(caixa[3] for caixa in caixas)
+    esquerda = min(caixa[0] for caixa in caixas)
+    direita = max(caixa[2] for caixa in caixas)
+
+    avanco = math.ceil(fonte.getlength("M"))
+    largura_celula = max(avanco, direita - esquerda)
+    altura_celula = base - topo
+
+    linhas = math.ceil(len(CHARSET) / colunas)
+    atlas = Image.new("RGBA", (colunas * largura_celula, linhas * altura_celula), (0, 0, 0, 0))
+    desenho = ImageDraw.Draw(atlas)
+
+    for indice, caractere in enumerate(CHARSET):
+        cx = (indice % colunas) * largura_celula
+        cy = (indice // colunas) * altura_celula
+        desenho.text((cx - esquerda, cy - topo), caractere, font=fonte, fill=(255, 255, 255, 255))
+
+    destino_png = ASSETS / "fonts" / "mono.png"
+    atlas.save(destino_png)
+
+    destino_fnt = ASSETS / "fonts" / "mono.fnt"
+    destino_fnt.write_text(
+        "# fonte bitmap gerada por tools/gen_assets.py\n"
+        f"cell {largura_celula} {altura_celula}\n"
+        f"cols {colunas}\n"
+        f"chars {CHARSET}\n",
+        encoding="utf-8",
+    )
+    print(f"{destino_png.name}: {atlas.width}x{atlas.height} "
+          f"(celula {largura_celula}x{altura_celula}, {len(CHARSET)} glifos)")
+
+
+def gerar_jogador(lado: int = 32) -> None:
+    img = Image.new("RGBA", (lado, lado), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    # corpo
+    d.rounded_rectangle([4, 6, lado - 5, lado - 3], radius=5,
+                        fill=(86, 168, 220, 255), outline=(24, 44, 66, 255), width=2)
+    # visor
+    d.rectangle([9, 12, lado - 10, 19], fill=(226, 244, 255, 255), outline=(24, 44, 66, 255))
+    # pupilas
+    d.rectangle([11, 14, 13, 17], fill=(24, 44, 66, 255))
+    d.rectangle([lado - 14, 14, lado - 12, 17], fill=(24, 44, 66, 255))
+    # antena
+    d.line([lado // 2, 6, lado // 2, 1], fill=(24, 44, 66, 255), width=2)
+    d.ellipse([lado // 2 - 3, 0, lado // 2 + 1, 4], fill=(240, 196, 84, 255),
+              outline=(24, 44, 66, 255))
+    destino = ASSETS / "textures" / "player.png"
+    img.save(destino)
+    print(f"{destino.name}: {img.width}x{img.height}")
+
+
+def gerar_tiles(lado: int = 16) -> None:
+    """Atlas 4x1: grama, terra, pedra, agua."""
+    paletas = [
+        ((96, 172, 84), (70, 138, 62), (52, 108, 48)),   # grama
+        ((150, 110, 74), (122, 88, 58), (96, 68, 44)),   # terra
+        ((132, 136, 148), (104, 108, 122), (78, 82, 96)),  # pedra
+        ((72, 128, 200), (56, 106, 176), (44, 86, 150)),  # agua
+    ]
+    img = Image.new("RGBA", (lado * len(paletas), lado), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    for i, (base, medio, escuro) in enumerate(paletas):
+        x0 = i * lado
+        d.rectangle([x0, 0, x0 + lado - 1, lado - 1], fill=base)
+        # ruido deterministico para o tile nao ficar chapado
+        for y in range(lado):
+            for x in range(lado):
+                h = (x * 7 + y * 13 + i * 31) % 11
+                if h == 0:
+                    d.point((x0 + x, y), fill=medio)
+                elif h == 1:
+                    d.point((x0 + x, y), fill=escuro)
+        d.rectangle([x0, 0, x0 + lado - 1, lado - 1], outline=escuro)
+    destino = ASSETS / "textures" / "tiles.png"
+    img.save(destino)
+    print(f"{destino.name}: {img.width}x{img.height}")
+
+
+def gerar_interior(lado: int = 16) -> None:
+    """Atlas do interior da nave: 0 piso, 1 grade, 2 piso escuro, 3 parede,
+    4 parede com faixa luminosa, 5 janela para o espaco."""
+    largura = lado * 6
+    img = Image.new("RGBA", (largura, lado), (0, 0, 0, 255))
+    d = ImageDraw.Draw(img)
+
+    def celula(i):
+        return i * lado
+
+    # 0: piso metalico com rebites
+    x = celula(0)
+    d.rectangle([x, 0, x + lado - 1, lado - 1], fill=(58, 66, 84))
+    d.rectangle([x, 0, x + lado - 1, lado - 1], outline=(46, 53, 69))
+    for py in (3, lado - 4):
+        for px in (3, lado - 4):
+            d.point((x + px, py), fill=(88, 98, 120))
+
+    # 1: grade de ventilacao
+    x = celula(1)
+    d.rectangle([x, 0, x + lado - 1, lado - 1], fill=(44, 50, 66))
+    for py in range(2, lado - 1, 3):
+        d.line([x + 2, py, x + lado - 3, py], fill=(70, 80, 100))
+    d.rectangle([x, 0, x + lado - 1, lado - 1], outline=(36, 42, 56))
+
+    # 2: piso escuro (variacao)
+    x = celula(2)
+    d.rectangle([x, 0, x + lado - 1, lado - 1], fill=(50, 57, 73))
+    d.rectangle([x, 0, x + lado - 1, lado - 1], outline=(42, 48, 62))
+    d.line([x + 2, lado - 3, x + lado - 3, lado - 3], fill=(64, 72, 92))
+
+    # 3: parede/casco
+    x = celula(3)
+    d.rectangle([x, 0, x + lado - 1, lado - 1], fill=(78, 86, 106))
+    d.line([x, 0, x + lado - 1, 0], fill=(104, 114, 138))
+    d.line([x + lado // 2, 1, x + lado // 2, lado - 1], fill=(64, 71, 90))
+    d.line([x, lado - 1, x + lado - 1, lado - 1], fill=(52, 58, 74))
+
+    # 4: parede com faixa luminosa
+    x = celula(4)
+    d.rectangle([x, 0, x + lado - 1, lado - 1], fill=(78, 86, 106))
+    d.line([x, 0, x + lado - 1, 0], fill=(104, 114, 138))
+    d.rectangle([x + 2, 5, x + lado - 3, 7], fill=(120, 220, 235))
+    d.rectangle([x + 2, 8, x + lado - 3, 8], fill=(60, 130, 150))
+    d.line([x, lado - 1, x + lado - 1, lado - 1], fill=(52, 58, 74))
+
+    # 5: janela para o espaco
+    x = celula(5)
+    d.rectangle([x, 0, x + lado - 1, lado - 1], fill=(10, 12, 26))
+    for (px, py, cor) in ((4, 4, (255, 255, 255)), (9, 7, (190, 210, 255)),
+                          (6, 11, (255, 235, 190)), (12, 3, (160, 190, 255)),
+                          (11, 12, (255, 255, 255))):
+        d.point((x + px, py), fill=cor)
+    d.rectangle([x, 0, x + lado - 1, lado - 1], outline=(96, 106, 130))
+
+    destino = ASSETS / "textures" / "interior.png"
+    img.save(destino)
+    print(f"{destino.name}: {img.width}x{img.height} (6 tiles de {lado}px)")
+
+
+def gerar_console(largura: int = 48, altura: int = 32) -> None:
+    """Painel de pilotagem: e nele que o jogador aperta E."""
+    img = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    # corpo
+    d.rounded_rectangle([0, 6, largura - 1, altura - 1], radius=3,
+                        fill=(62, 70, 90), outline=(30, 35, 47), width=1)
+    # tres telas
+    telas = [((4, 9, 16, 20), (72, 200, 160)),
+             ((18, 9, 30, 20), (110, 190, 255)),
+             ((32, 9, 44, 20), (240, 180, 90))]
+    for (caixa, cor) in telas:
+        d.rectangle(caixa, fill=(14, 18, 30), outline=(24, 30, 44))
+        x0, y0, x1, y1 = caixa
+        for i, py in enumerate(range(y0 + 2, y1 - 1, 3)):
+            largura_linha = (x1 - x0 - 4) - (i % 3) * 3
+            d.line([x0 + 2, py, x0 + 2 + largura_linha, py], fill=cor)
+
+    # teclado / borda inferior
+    d.rectangle([3, 23, largura - 4, altura - 4], fill=(46, 53, 69), outline=(30, 35, 47))
+    for px in range(6, largura - 6, 4):
+        d.point((px, 26), fill=(120, 132, 156))
+        d.point((px, 29), fill=(120, 132, 156))
+
+    # antena/suporte no topo
+    d.rectangle([largura // 2 - 8, 2, largura // 2 + 8, 6], fill=(52, 60, 78),
+                outline=(30, 35, 47))
+
+    destino = ASSETS / "textures" / "console.png"
+    img.save(destino)
+    print(f"{destino.name}: {img.width}x{img.height}")
+
+
+def gerar_wav(nome: str, freq: float, duracao: float, forma: str = "quadrada") -> None:
+    taxa = 44100
+    total = int(taxa * duracao)
+    quadros = bytearray()
+    for i in range(total):
+        t = i / taxa
+        fase = 2.0 * math.pi * freq * t
+        if forma == "quadrada":
+            amostra = 1.0 if math.sin(fase) >= 0.0 else -1.0
+        else:
+            amostra = math.sin(fase)
+        # envelope de ataque/decaimento para nao estalar
+        ataque = min(1.0, i / (taxa * 0.005))
+        decaimento = max(0.0, 1.0 - i / total)
+        valor = int(amostra * ataque * (decaimento ** 2) * 0.35 * 32767)
+        quadros += struct.pack("<h", valor)
+
+    destino = ASSETS / "audio" / nome
+    with wave.open(str(destino), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(taxa)
+        w.writeframes(bytes(quadros))
+    print(f"{destino.name}: {duracao * 1000:.0f} ms @ {freq:.0f} Hz")
+
+
+def main() -> None:
+    for sub in ("textures", "fonts", "audio"):
+        (ASSETS / sub).mkdir(parents=True, exist_ok=True)
+    gerar_fonte()
+    gerar_jogador()
+    gerar_tiles()
+    gerar_interior()
+    gerar_console()
+    gerar_wav("blip.wav", 660.0, 0.07)
+    gerar_wav("confirm.wav", 990.0, 0.14)
+    gerar_wav("back.wav", 330.0, 0.12)
+
+
+if __name__ == "__main__":
+    main()
