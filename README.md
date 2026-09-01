@@ -81,6 +81,6 @@ Mapa do código, como adicionar uma cena e como adicionar assets:
 
 Código sob a licença MIT — veja [LICENSE](LICENSE).
 
-**Exceção:** a fonte bitmap em `assets/fonts/` é derivada da Liberation Mono e
-continua sob a SIL Open Font License 1.1. Os detalhes e o texto da licença estão
-em [assets/fonts/README.md](assets/fonts/README.md).
+O atlas de texto é rasterizado da [unscii](http://viznut.fi/unscii/), fonte
+bitmap de Viznut em domínio público, que acompanha o repositório:
+[assets/fonts/README.md](assets/fonts/README.md).

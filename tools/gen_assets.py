@@ -4,8 +4,8 @@
 Requer Pillow apenas para gerar as imagens; o jogo em si nao depende de nada
 alem do SDL3.
 
-O atlas de texto e rasterizado da Liberation Mono, que e distribuida sob a SIL
-Open Font License 1.1 -- veja assets/fonts/README.md antes de trocar a fonte.
+O atlas de texto e rasterizado da unscii-16, uma fonte bitmap em dominio
+publico que acompanha o repositorio -- veja assets/fonts/README.md.
 
 Rode a partir da raiz do projeto:
 
@@ -24,7 +24,9 @@ from PIL import Image, ImageDraw, ImageFont
 RAIZ = Path(__file__).resolve().parent.parent
 ASSETS = RAIZ / "assets"
 
-FONTE_SISTEMA = Path("/usr/share/fonts/liberation/LiberationMono-Regular.ttf")
+# Fonte empacotada no proprio repositorio: gerar o atlas nao depende de nada
+# instalado no sistema.
+FONTE = ASSETS / "fonts" / "unscii-16.ttf"
 
 # Espaco e tratado como avanco em branco, entao fica fora do atlas.
 CHARSET = (
@@ -38,10 +40,10 @@ CHARSET = (
 
 
 def gerar_fonte(tamanho_px: int = 16, colunas: int = 16) -> None:
-    if not FONTE_SISTEMA.exists():
-        raise SystemExit(f"fonte nao encontrada: {FONTE_SISTEMA} (instale ttf-liberation)")
+    if not FONTE.exists():
+        raise SystemExit(f"fonte nao encontrada: {FONTE}")
 
-    fonte = ImageFont.truetype(str(FONTE_SISTEMA), tamanho_px)
+    fonte = ImageFont.truetype(str(FONTE), tamanho_px)
 
     # A celula precisa caber o glifo mais alto e o descendente mais fundo de
     # todo o charset; caso contrario um "g" vaza para a celula de baixo no atlas.
@@ -63,6 +65,11 @@ def gerar_fonte(tamanho_px: int = 16, colunas: int = 16) -> None:
         cx = (indice % colunas) * largura_celula
         cy = (indice // colunas) * altura_celula
         desenho.text((cx - esquerda, cy - topo), caractere, font=fonte, fill=(255, 255, 255, 255))
+
+    # A unscii e uma fonte de pixels: o antialiasing do rasterizador so borraria
+    # as bordas, entao o alfa vira 1 bit.
+    alfa = atlas.getchannel("A").point(lambda v: 255 if v >= 128 else 0)
+    atlas.putalpha(alfa)
 
     destino_png = ASSETS / "fonts" / "mono.png"
     atlas.save(destino_png)
