@@ -89,7 +89,13 @@ mapeamento para teclado e gamepad vive numa tabela única no topo de
 
 **Áudio.** Sem SDL3_mixer: cada reprodução é um `SDL_AudioStream` ligado ao
 dispositivo, que faz a mixagem, com carência de 250 ms antes de recolher a voz
-para não cortar o fim do som.
+para não cortar o fim do som. Um loop (`tocarEmLoop`) é a mesma voz reabastecida
+em `atualizar()` enquanto a fila do fluxo estiver com menos de meio segundo, e é
+o único caso em que **não** se chama `SDL_FlushAudioStream`: o flush anuncia o
+fim do sinal e faria o reamostrador zerar o estado a cada volta, marcando a
+emenda. O WAV do loop também precisa emendar sozinho — `gerar_ambiente` em
+`tools/gen_assets.py` roda o filtro do ruído marrom em círculo justamente para
+isso.
 
 ## Dependências
 

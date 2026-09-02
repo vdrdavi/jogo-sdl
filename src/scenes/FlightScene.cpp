@@ -76,6 +76,21 @@ void FlightScene::aoEntrar(Context& ctx) {
 
     estrelas_.centralizar(pose_.camera);
     somSaida_ = ctx.audio.carregar("audio/back.wav");
+
+    // Ruido marrom em loop: o "la fora" da cena de voo. Comeca mudo e sobe em
+    // atualizar(), para a troca de cena nao estourar um rugido do nada.
+    ambiente_ = 0.0f;
+    somAmbiente_ = ctx.audio.carregar("audio/espaco.wav");
+    vozAmbiente_ = ctx.audio.tocarEmLoop(somAmbiente_, ambiente_);
+}
+
+void FlightScene::aoSair(Context& ctx) {
+    ctx.audio.parar(vozAmbiente_, kAmbienteSaida);
+    vozAmbiente_ = 0;
+}
+
+float FlightScene::fatorTurbo() const {
+    return (velocidade_ - kVelocidadeCruzeiro) / (kVelocidadeTurbo - kVelocidadeCruzeiro);
 }
 
 void FlightScene::atualizar(Context& ctx, float dt) {
@@ -109,6 +124,12 @@ void FlightScene::atualizar(Context& ctx, float dt) {
 
     // Campo infinito: as estrelas sao reposicionadas em torno da camera.
     estrelas_.centralizar(pose_.camera);
+
+    // O ambiente entra do zero e depois acompanha o esforco do motor.
+    const float alvoAmbiente =
+        kAmbienteCruzeiro + (kAmbienteTurbo - kAmbienteCruzeiro) * fatorTurbo();
+    ambiente_ = aproximar(ambiente_, alvoAmbiente, kTaxaAmbiente, dt);
+    ctx.audio.ajustarGanho(vozAmbiente_, ambiente_);
 }
 
 void FlightScene::desenhar(Context& ctx, float alpha) {
@@ -143,8 +164,7 @@ void FlightScene::desenhar(Context& ctx, float alpha) {
     SDL_FPoint motor;
     float profundidade = 0.0f;
     if (cena_.projetar(posicao + rotacao * Vec3{0.0f, 0.05f, 1.75f}, motor, &profundidade)) {
-        const float intensidade = 0.35f + 0.65f * (velocidade_ - kVelocidadeCruzeiro) /
-                                              (kVelocidadeTurbo - kVelocidadeCruzeiro);
+        const float intensidade = 0.35f + 0.65f * fatorTurbo();
         const float tremor = 0.9f + 0.1f * std::sin(tempo_ * 30.0f);
         brilhoAditivo(ctx.renderer, motor, cena_.escalaEmTela(profundidade) * 0.55f * tremor,
                       SDL_FColor{1.0f * intensidade, 0.55f * intensidade, 0.22f * intensidade,

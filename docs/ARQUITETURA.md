@@ -27,7 +27,7 @@ src/
 │  ├─ Mesh.*             malha low poly com cor por face + a nave
 │  ├─ Renderer3D.*       projeção, recorte, culling, pintor, SDL_RenderGeometry
 │  └─ Starfield.*        campo de estrelas procedural com rastro
-├─ audio/Audio.*         WAVs em memória, vozes mixadas pelo dispositivo
+├─ audio/Audio.*         WAVs em memória, vozes (e loops) mixados pelo dispositivo
 ├─ scene/                Scene (interface) e SceneStack (transições adiadas)
 └─ scenes/               MenuScene, InteriorScene, FlightScene, PauseScene
 ```
@@ -70,6 +70,10 @@ auto som         = ctx.audio.carregar("audio/pulo.wav");
 
 Imagens: PNG ou BMP. Áudio: WAV. Ambos são carregados pelo core do SDL, e as
 texturas ficam em cache pelo caminho — pedir a mesma duas vezes não recarrega.
+
+Um som contínuo usa `ctx.audio.tocarEmLoop(...)`, que devolve o handle da voz
+para `ajustarGanho` e `parar` (com *fade*, se quiser). O WAV precisa emendar o
+fim no começo — veja `gerar_ambiente` em `tools/gen_assets.py`.
 
 Os placeholders versionados saem de `tools/gen_assets.py` (Pillow), que gera as
 texturas, os efeitos sonoros e o atlas da fonte bitmap. Para formatos além de

@@ -17,6 +17,7 @@ public:
     FlightScene();
 
     void aoEntrar(Context& ctx) override;
+    void aoSair(Context& ctx) override;
     void atualizar(Context& ctx, float dt) override;
     void desenhar(Context& ctx, float alpha) override;
 
@@ -28,6 +29,15 @@ private:
     static constexpr float kLimitePitch = 1.15f; // rad
     static constexpr float kFovBase = 62.0f;
     static constexpr float kFovTurbo = 80.0f;
+    // Ruido do casco: sempre presente, mais forte quando o motor abre.
+    static constexpr float kAmbienteCruzeiro = 0.45f;
+    static constexpr float kAmbienteTurbo = 0.9f;
+    static constexpr float kTaxaAmbiente = 2.0f;    // 1/s: sobe do zero ao entrar
+    static constexpr float kAmbienteSaida = 0.35f;  // s de fade ao sair
+
+    /// 0 no cruzeiro, 1 no turbo: liga o brilho do escapamento e o volume do
+    /// ambiente a mesma medida de esforco do motor.
+    float fatorTurbo() const;
 
     /// Estado interpolavel entre dois passos fixos.
     struct Pose {
@@ -49,9 +59,12 @@ private:
     float velocidade_{kVelocidadeCruzeiro};
     float fov_{kFovBase};
     float tempo_{0.0f};
+    float ambiente_{0.0f};
     bool turbo_{false};
 
     Audio::SomId somSaida_{0};
+    Audio::SomId somAmbiente_{0};
+    Audio::VozId vozAmbiente_{0};
 };
 
 }  // namespace jogo

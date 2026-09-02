@@ -15,6 +15,7 @@ Rode a partir da raiz do projeto:
 from __future__ import annotations
 
 import math
+import random
 import struct
 import wave
 from pathlib import Path
@@ -253,6 +254,62 @@ def gerar_wav(nome: str, freq: float, duracao: float, forma: str = "quadrada") -
     print(f"{destino.name}: {duracao * 1000:.0f} ms @ {freq:.0f} Hz")
 
 
+def ruido_marrom(total: int, taxa: int, corte: float, semente: int) -> list[float]:
+    """Ruido marrom (-6 dB por oitava) que emenda o fim no comeco.
+
+    Ruido marrom e ruido branco integrado; um integrador com vazamento
+    (y = a*y + (1-a)*x) da o mesmo espectro e ainda por cima nao deriva.
+
+    O filtro roda em circulo: a primeira passada serve so para aquecer o estado
+    e a segunda e a que fica. Assim a ultima amostra emenda na primeira
+    exatamente como emendaria no meio do sinal -- sem crossfade, sem estalo na
+    virada do loop. Funciona porque a resposta do filtro decai (a**total e
+    desprezivel), entao o estado depois de uma volta ja e o estado de regime no
+    ponto de partida.
+    """
+    aleatorio = random.Random(semente)
+    branco = [aleatorio.uniform(-1.0, 1.0) for _ in range(total)]
+
+    a = math.exp(-2.0 * math.pi * corte / taxa)
+    estado = 0.0
+    for x in branco:  # aquecimento: so o estado final interessa
+        estado = a * estado + (1.0 - a) * x
+    marrom = []
+    for x in branco:
+        estado = a * estado + (1.0 - a) * x
+        marrom.append(estado)
+
+    media = sum(marrom) / total
+    return [v - media for v in marrom]
+
+
+def escrever_wav(nome: str, amostras: list[float], taxa: int) -> None:
+    quadros = bytearray()
+    for v in amostras:
+        quadros += struct.pack("<h", int(max(-0.99, min(0.99, v)) * 32767))
+    destino = ASSETS / "audio" / nome
+    with wave.open(str(destino), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(taxa)
+        w.writeframes(bytes(quadros))
+
+
+def gerar_ambiente(nome: str, duracao: float = 4.0, taxa: int = 22050,
+                   corte: float = 18.0, rms_alvo: float = 0.16,
+                   semente: int = 0xB2011) -> None:
+    """Ruido marrom em loop: o zumbido do lado de fora da nave."""
+    total = int(taxa * duracao)
+    marrom = ruido_marrom(total, taxa, corte, semente)
+
+    # Normaliza por RMS, nao por pico: o pico de um ruido marrom e erratico e
+    # deixaria o volume percebido a merce de um unico estouro.
+    rms = math.sqrt(sum(v * v for v in marrom) / total)
+    ganho = rms_alvo / rms if rms > 0.0 else 0.0
+    escrever_wav(nome, [v * ganho for v in marrom], taxa)
+    print(f"{nome}: {duracao:.1f} s @ {taxa} Hz em loop (ruido marrom)")
+
+
 def main() -> None:
     for sub in ("textures", "fonts", "audio"):
         (ASSETS / sub).mkdir(parents=True, exist_ok=True)
@@ -264,6 +321,7 @@ def main() -> None:
     gerar_wav("blip.wav", 660.0, 0.07)
     gerar_wav("confirm.wav", 990.0, 0.14)
     gerar_wav("back.wav", 330.0, 0.12)
+    gerar_ambiente("espaco.wav")
 
 
 if __name__ == "__main__":

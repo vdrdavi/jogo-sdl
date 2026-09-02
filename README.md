@@ -60,6 +60,18 @@ câmera: um campo infinito com memória constante. O rastro sai de projetar a
 estrela deslocada de `velocidade * Δt` e desenhar um quadrilátero que desvanece
 na cauda, em blending aditivo.
 
+## Som
+
+Sem `SDL3_mixer`: cada reprodução é um `SDL_AudioStream` ligado ao dispositivo,
+que faz a mixagem. Além dos efeitos, o voo tem um ambiente em *loop* — ruído
+marrom cujo ganho acompanha o esforço do motor, entrando do zero e saindo em
+*fade* ao deixar a cena.
+
+O WAV do ambiente é gerado em `tools/gen_assets.py` por um integrador com
+vazamento rodado **em círculo**: uma passada só para aquecer o estado e outra
+para valer, de modo que a última amostra emenda na primeira como emendaria no
+meio do sinal — o loop não tem costura audível e não precisa de crossfade.
+
 ## Como o laço funciona
 
 `App::rodar()` mede o tempo real do quadro, acumula e simula em fatias fixas de
