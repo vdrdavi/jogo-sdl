@@ -7,6 +7,7 @@
 #include "gfx3d/Renderer3D.hpp"
 #include "gfx3d/Starfield.hpp"
 #include "scene/Scene.hpp"
+#include "scenes/Transicao.hpp"
 #include "sim/Flight.hpp"
 
 namespace jogo {
@@ -26,6 +27,9 @@ public:
 private:
     static constexpr float kFovBase = 62.0f;
     static constexpr float kFovTurbo = 80.0f;
+    /// Quanto o campo de visao nasce fechado: a cabine abre do painel para o
+    /// espaco, entao a vista alarga em vez de aparecer pronta.
+    static constexpr float kAberturaFov = 12.0f;
     /// A nevoa comeca antes da borda do campo, para as rochas emergirem do vazio.
     static constexpr float kNevoaInicio = 45.0f;
     static constexpr float kAmplitudeTremor = 0.55f;  // unidades de mundo
@@ -44,6 +48,8 @@ private:
     Renderer3D cena_;
     Starfield estrelas_;
     Mesh nave_;
+
+    Transicao transicao_;
 
     float fov_{kFovBase};
     float tempo_{0.0f};

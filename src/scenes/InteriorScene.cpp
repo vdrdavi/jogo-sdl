@@ -105,7 +105,7 @@ void InteriorScene::aoEntrar(Context& ctx) {
     posicao_ = SDL_FPoint{console_.x + console_.w * 0.5f, console_.y + console_.h + 14.0f};
     posicaoAnterior_ = posicao_;
 
-    camera_.definirZoom(2.0f);
+    camera_.definirZoom(kZoom);
     camera_.definirPosicao(posicao_);
     camera_.limitarA(mundo);
 
@@ -118,6 +118,26 @@ void InteriorScene::aoSair(Context& ctx) {
     voo_.encerrar(ctx);
 }
 
+void InteriorScene::aoRetomar(Context&) {
+    // A cabine fechou. A cortina esta abaixada desde que ela abriu, entao o
+    // conves reaparece de dentro dela -- e a camera desfaz o zoom pelo mesmo
+    // caminho, de tras para frente. Voltar da pausa nao mexe em nada: ali a
+    // transicao esta parada.
+    if (transicao_.saindo()) {
+        transicao_.iniciarEntrada();
+    }
+}
+
+void InteriorScene::aproximarDoConsole(float dt) {
+    // Zoom e alvo andam pela cobertura da cortina, nao pelo tempo: assim a
+    // volta e o mesmo movimento invertido, sem uma segunda curva para manter.
+    const float k = transicao_.cobertura();
+    camera_.definirZoom(kZoom + (kZoomConsole - kZoom) * k);
+    const SDL_FPoint painel{console_.x + console_.w * 0.5f, console_.y + console_.h * 0.5f};
+    camera_.seguir(interpolar(posicao_, painel, k), dt, 9.0f);
+    camera_.limitarA(limitesDoMundo());
+}
+
 void InteriorScene::atualizar(Context& ctx, float dt) {
     tempo_ += dt;
     posicaoAnterior_ = posicao_;
@@ -127,6 +147,17 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
     // FlightScene esta no topo, ela e quem chama isto (e esta cena nem roda).
     voo_.atualizar(ctx, dt, Flight::Comando{});
 
+    // Com a cortina em cena o jogador ja nao comanda nada: nenhuma tecla e lida
+    // (um segundo E empilharia uma segunda cabine) e a camera termina o
+    // movimento sozinha. O voo, esse, continua recebendo o passo la em cima.
+    if (transicao_.ativa()) {
+        if (transicao_.avancar(dt)) {
+            ctx.cenas.empilhar(std::make_unique<FlightScene>(voo_));
+        }
+        aproximarDoConsole(dt);
+        return;
+    }
+
     if (ctx.input.acaoPressionada(Acao::Pausar)) {
         ctx.cenas.empilhar(std::make_unique<PauseScene>());
         return;
@@ -134,7 +165,11 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
 
     if (pertoDoConsole() && ctx.input.acaoPressionada(Acao::Interagir)) {
         ctx.audio.tocar(somConfirmar_);
-        ctx.cenas.empilhar(std::make_unique<FlightScene>(voo_));
+        // A cabine so e empilhada quando a cortina cobrir a tela; ate la, o
+        // conves continua rodando. O casco para de abafar ja agora, para o
+        // ambiente do lado de fora abrir junto com a imagem.
+        transicao_.iniciarSaida();
+        voo_.definirAbafado(false);
         return;
     }
 
@@ -238,6 +273,8 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
                                   tamanhoDica.x + 16.0f, tamanhoDica.y + 8.0f},
                         kCorPainel);
     ctx.fonte.desenharCentralizado(ctx.renderer, dica, meio, yDica, kCorHud, 1.0f);
+
+    transicao_.desenhar(ctx.renderer);
 }
 
 }  // namespace jogo

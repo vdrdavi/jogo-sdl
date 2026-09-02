@@ -40,6 +40,7 @@ add_executable(jogo
     src/scenes/InteriorScene.cpp
     src/scenes/FlightScene.cpp
     src/scenes/PauseScene.cpp
+    src/scenes/Transicao.cpp
 )
 
 target_include_directories(jogo PRIVATE src)

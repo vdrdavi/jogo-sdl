@@ -79,7 +79,12 @@ void FlightScene::aoEntrar(Context& ctx) {
     cameraCima_ = rotacao.cima();
     estrelas_.centralizar(camera_);
 
-    fov_ = kFovBase;
+    // A vista abre do painel: a cortina que o conves fechou levanta daqui, e o
+    // campo de visao comeca fechado e alarga sozinho na suavizacao que ja
+    // existia para o turbo.
+    transicao_.iniciarEntrada();
+    fov_ = kFovBase - kAberturaFov;
+
     somSaida_ = ctx.audio.carregar("audio/back.wav");
     voo_.definirAbafado(false);
 }
@@ -92,15 +97,28 @@ void FlightScene::aoSair(Context&) {
 void FlightScene::atualizar(Context& ctx, float dt) {
     tempo_ += dt;
 
-    if (ctx.input.acaoPressionada(Acao::Voltar) || ctx.input.acaoPressionada(Acao::Pausar)) {
+    // Sair e fechar a cortina; a pilha so desempilha quando ela cobrir a tela,
+    // e do outro lado o conves reabre a partir dela. Enquanto isso nao chega,
+    // esta cena continua sendo quem da o passo do voo.
+    if (!transicao_.saindo() && (ctx.input.acaoPressionada(Acao::Voltar) ||
+                                 ctx.input.acaoPressionada(Acao::Pausar))) {
         ctx.audio.tocar(somSaida_);
+        // O casco volta a abafar ja no comeco da cortina, para o som fechar
+        // junto com a imagem; a rampa do Flight cuida de nao virar degrau.
+        voo_.definirAbafado(true);
+        transicao_.iniciarSaida();
+    }
+    if (transicao_.avancar(dt)) {
         ctx.cenas.desempilhar();
-        return;
     }
 
+    // Com a cortina fechando, o piloto ja largou os controles: o voo segue no
+    // automatico -- e recebe o passo do mesmo jeito, sem buraco na simulacao.
     Flight::Comando comando;
-    comando.eixo = ctx.input.eixoMovimento();
-    comando.turbo = ctx.input.acaoAtiva(Acao::Confirmar);
+    if (!transicao_.saindo()) {
+        comando.eixo = ctx.input.eixoMovimento();
+        comando.turbo = ctx.input.acaoAtiva(Acao::Confirmar);
+    }
     voo_.atualizar(ctx, dt, comando);
 
     fov_ = aproximar(fov_, voo_.turbo() ? kFovTurbo : kFovBase, 4.0f, dt);
@@ -201,6 +219,8 @@ void FlightScene::desenhar(Context& ctx, float alpha) {
                                   tamanhoDica.x + 16.0f, tamanhoDica.y + 8.0f},
                         kCorPainel);
     ctx.fonte.desenharCentralizado(ctx.renderer, dica, cx, yDica, kCorHud, 1.0f);
+
+    transicao_.desenhar(ctx.renderer);
 }
 
 }  // namespace jogo

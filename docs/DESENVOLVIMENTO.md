@@ -87,6 +87,10 @@ Duas perguntas decidem o que acontece com as de baixo:
 
 É assim que a `PauseScene` congela a partida sem escondê-la.
 
+Uma cena sabe quando entra (`aoEntrar`), quando sai (`aoSair`) e quando **volta
+a ser o topo** porque a de cima desempilhou (`aoRetomar`) — é deste último que a
+`InteriorScene` reabre a cortina ao sair da cabine.
+
 As transições (`empilhar`, `desempilhar`, `substituir`) são **adiadas para o fim
 do quadro**. Sem isso, uma cena que se trocasse durante o próprio `atualizar()`
 destruiria o objeto no meio da execução do método dele — e invalidaria a pilha
@@ -661,6 +665,167 @@ Os caminhos de erro foram exercitados um a um, editando a cópia dos assets em
 Build limpo do zero nos dois presets, sem nenhum warning, e o teste de fumaça
 sem sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 
+### 2026-09-02 — A passagem entre o convés e a cabine (issue #3)
+
+**O pedido:** apertar E trocava de tela em corte seco; o convés e a cabine
+deviam se emendar por um fade ou por um zoom no painel.
+
+#### O que havia e por que incomodava
+
+`InteriorScene::atualizar` empilhava a `FlightScene` no mesmo passo em que a
+tecla era lida. Como a pilha aplica as transições no fim do quadro, o quadro
+seguinte já era o espaço: **um quadro de convés, o próximo de estrelas**. Não é
+um bug — é o corte. O que falta é o olho entender que as duas imagens são o
+mesmo lugar visto de dois jeitos.
+
+#### A ideia da issue e por que ela não foi usada
+
+A issue sugeria uma cena de *overlay* por cima das duas (`bloqueiaRender() ==
+false`). Ela não serve, por duas razões que só aparecem quando se tenta:
+
+1. **A cortina teria que sobreviver à troca da cena de baixo.** Uma transição de
+   duas metades — escurecer sobre o convés, clarear sobre a cabine — precisa de
+   um objeto que atravesse a troca. A `SceneStack` só mexe no **topo**
+   (`empilhar`/`desempilhar`/`substituir`), e a cortina *é* o topo: para a
+   `FlightScene` entrar embaixo dela seria preciso inventar um "empilhar abaixo
+   do topo", ou seja, uma pilha que não é mais uma pilha.
+2. **Ela roubaria o passo do voo.** Quem chama `Flight::atualizar` é a cena
+   ativa. Uma cortina que bloqueia o update congelaria o voo (ou teria que
+   pilotar a nave ela própria); uma que não bloqueia deixaria a cena de baixo
+   continuar **lendo o teclado** durante a passagem — um segundo E empilharia
+   uma segunda cabine.
+
+#### O que foi feito: a cortina é estado, não cena
+
+`Transicao` ([`src/scenes/Transicao.hpp`](../src/scenes/Transicao.hpp)) é uma
+classe de trinta linhas que cada cena **guarda como membro** e desenha por cima
+de si mesma, depois do HUD. Ela sabe só duas coisas: em que metade está
+(fechando ou abrindo) e quanto já andou.
+
+- `iniciarSaida()` fecha a cortina em 0,24 s e **fica fechada** — não se desliga
+  sozinha. É isso que faz as duas metades emendarem: o convés continua coberto o
+  tempo todo em que a cabine está por cima, e a volta continua de onde parou.
+- `avancar(dt)` devolve `true` no **único** passo em que a saída acaba de cobrir
+  a tela. Esse é o instante da troca de cena: quem chama decide o que fazer
+  (`empilhar` a cabine, `desempilhar` de volta).
+- `iniciarEntrada()` abre a cortina em 0,20 s a partir da tela cheia.
+
+A cor é a mesma dos dois lados — `{14, 30, 48}`, o vidro escuro do painel, entre
+o azul do convés e o `{5, 6, 14}` do espaço. É nela que as duas metades se
+encontram, e é por isso que o encontro não aparece.
+
+A curva é um **smoothstep** (`t²(3−2t)`), que sai e chega com velocidade zero.
+Com rampa linear a mesma duração parecia mais curta e a cortina "batia" no fim.
+
+#### O gancho que faltava: `aoRetomar`
+
+`Scene` tinha `aoEntrar` e `aoSair`: uma cena sabe quando entra e quando sai,
+mas **não sabe quando volta a ser o topo**. E é exatamente isso que a
+`InteriorScene` precisa saber — é quando a cabine desempilha que ela tem de
+reabrir a cortina.
+
+A alternativa sem gancho era deduzir: "meu `atualizar` voltou a rodar enquanto
+eu estou coberto, logo a cabine fechou". Funciona, porque a `FlightScene`
+bloqueia o update de quem está embaixo — e é justamente por depender de um
+detalhe de outra cena que foi descartada. Uma linha em `SceneStack` diz a mesma
+coisa em voz alta:
+
+```cpp
+case Tipo::Desempilhar:
+    if (!pilha_.empty()) {
+        pilha_.back()->aoSair(ctx);
+        pilha_.pop_back();
+        if (!pilha_.empty()) {
+            pilha_.back()->aoRetomar(ctx);
+        }
+    }
+```
+
+`aoRetomar` também dispara ao sair da pausa, e por isso a `InteriorScene` só age
+se a cortina estiver fechada (`transicao_.saindo()`): despausar não é voltar de
+lugar nenhum.
+
+#### O zoom, de graça na volta
+
+Enquanto a cortina fecha, a câmera do convés se inclina sobre o painel: o zoom
+vai de 2,0 a 3,1 e o alvo do seguidor caminha do jogador para o centro do
+console. O parâmetro dessa interpolação **não é o tempo, é a própria cobertura
+da cortina** — então a volta é o mesmo movimento de trás para frente, sem uma
+segunda curva para manter em sincronia com a primeira.
+
+Do outro lado a cabine faz o complemento: nasce com o campo de visão 12° mais
+fechado (`kFovBase − kAberturaFov`) e alarga na mesma suavização que já existia
+para o turbo. O convés fecha em cima do painel, o espaço abre a partir dele.
+
+O som acompanha: `definirAbafado` passa a ser chamado no **começo** da cortina
+dos dois lados (antes era ao entrar e ao sair da `FlightScene`, isto é, no fim).
+A rampa do `Flight` já transformava o degrau em *swell*; agora o swell começa
+junto com a imagem em vez de 0,24 s depois dela.
+
+#### O passo perdido, que só apareceu ao medir
+
+A `FlightScene` antiga saía assim:
+
+```cpp
+if (ctx.input.acaoPressionada(Acao::Voltar) || ...) {
+    ctx.audio.tocar(somSaida_);
+    ctx.cenas.desempilhar();
+    return;                 // <- antes de voo_.atualizar()
+}
+```
+
+O `return` pulava o `voo_.atualizar` daquele passo, e a `InteriorScene` não
+cobria a falta (a `FlightScene` ainda estava no topo, bloqueando o update dela).
+Ou seja: **cada volta ao convés custava um passo do voo** — 1/60 s de viagem que
+não aconteceu. Invisível a olho nu, mas é exatamente a invariante que a Parte 1.8
+promete.
+
+A reescrita não podia repetir isso, com uma cortina de 15 passos no meio. O
+`atualizar` da cabine passou a ter um caminho só: a tecla apenas *inicia* a
+saída, e o `voo_.atualizar` acontece sempre — com o comando do jogador enquanto
+ele pilota, com `Comando{}` depois que a cortina começa a fechar (o piloto
+largou os controles; o voo segue no automático, como quando ele anda pelo
+convés).
+
+#### Verificação
+
+Captura determinística com o patch `// TEMP` de sempre (`SDL_RenderReadPixels` +
+`SDL_SavePNG`, `SDL_VIDEODRIVER=dummy`, `main.cpp` apontado para a
+`InteriorScene`), com a ida e a volta disparadas por contador de passos em vez de
+tecla — injetar tecla no compositor é frágil, e aqui nem seria determinístico.
+
+**A emenda não aparece.** Os quadros dos dois lados da troca, em média e em
+extremos de cada canal (1280×720, RGB):
+
+| Passo | Quem desenhou | Média | Mín | Máx |
+|---|---|---|---|---|
+| 44 | convés, cortina cheia | (14,0 / 30,0 / 48,0) | (14,30,48) | (14,30,48) |
+| 45 | **cabine**, cortina abrindo | (13,1 / 29,1 / 46,1) | (13,29,46) | (17,34,51) |
+| 84 | cabine, cortina cheia | (14,0 / 30,0 / 48,0) | (14,30,48) | (14,30,48) |
+| 85 | **convés**, cortina abrindo | (13,9 / 30,1 / 47,3) | (13,29,46) | (19,35,52) |
+
+No quadro em que a cena de baixo troca, a tela muda **no máximo 2 níveis por
+canal** — contra o salto de imagem inteira do corte seco. (Os 13/29/46 do lado
+que já está abrindo não são erro: com a cortina em 0,98 o renderer de software
+mistura um fio do fundo por baixo, e o arredondamento inteiro do blend tira o
+resto.)
+
+**O voo não perde nem ganha passo.** Um contador `// TEMP` dentro de
+`Flight::atualizar`, contra os 101 passos fixos que o `App` rodou no roteiro
+(entrar na cabine, voar, voltar):
+
+| Caminho | Passos do voo em 101 passos fixos |
+|---|---|
+| corte seco (antes) | **100** |
+| com a cortina | **101** |
+
+A posição avança 1,0333 unidade em **todos** os passos, inclusive nos dois em que
+a cena de baixo troca: nem buraco, nem passo dobrado.
+
+Build limpo do zero nos dois presets, sem nenhum warning, e o teste de fumaça sem
+sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
+
+
 ## Glossário
 
 | Termo | O que é |
@@ -673,6 +838,7 @@ sem sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 | **Back-face culling** | Descartar as faces que apontam para o lado oposto ao da câmera. |
 | **Borda (entrada)** | O instante em que uma tecla passa de solta a pressionada (ou o contrário). |
 | **Crossfade** | Misturar o fim de um trecho com o começo do outro. Altera o espectro. |
+| **Cortina (transição)** | Retângulo de cor que cobre a tela para emendar duas cenas sem corte. |
 | **dB por oitava** | Quanto a amplitude cai cada vez que a frequência dobra. |
 | **Delta time** | Tempo real decorrido entre dois quadros. |
 | **Determinístico** | Mesma entrada, mesmo resultado, sempre. |
@@ -695,6 +861,7 @@ sem sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 | **Mixar** | Somar várias fontes de áudio em uma saída. |
 | **Névoa (fog)** | Misturar a cor das faces com a cor do fundo conforme a distância. |
 | **Normal** | Vetor perpendicular a uma face; diz para que lado ela aponta. |
+| **Overlay** | Cena desenhada por cima de outra, que continua aparecendo atrás. |
 | **Passo fixo** | Simular sempre em fatias de tempo iguais, independentemente da taxa de quadros. |
 | **PCM** | Som como sequência de amplitudes amostradas. |
 | **Pico / RMS** | Maior amplitude / amplitude quadrática média (esta corresponde melhor ao volume percebido). |
@@ -708,6 +875,7 @@ sem sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 | **Seção de choque** | Área efetiva do alvo em um cálculo de colisão. |
 | **Shader** | Programa que roda na placa de vídeo. Este projeto não usa nenhum. |
 | **Sombreamento flat** | Uma cor por face, sem interpolar entre vértices. |
+| **Smoothstep** | Curva `t²(3−2t)`: vai de 0 a 1 saindo e chegando parada. |
 | **Sutherland–Hodgman** | Algoritmo de recorte de polígono contra um plano. |
 | **Teste de fumaça** | Verificação mínima de que o programa sobe e roda. |
 | **Tile** | Peça quadrada com que um cenário 2D é montado. |

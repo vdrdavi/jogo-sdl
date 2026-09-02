@@ -6,6 +6,7 @@
 #include "gfx/Camera.hpp"
 #include "gfx/Sprite.hpp"
 #include "scene/Scene.hpp"
+#include "scenes/Transicao.hpp"
 #include "sim/Flight.hpp"
 #include "world/MapaDeTiles.hpp"
 
@@ -24,6 +25,7 @@ public:
 
     void aoEntrar(Context& ctx) override;
     void aoSair(Context& ctx) override;
+    void aoRetomar(Context& ctx) override;
     void atualizar(Context& ctx, float dt) override;
     void desenhar(Context& ctx, float alpha) override;
 
@@ -31,16 +33,22 @@ private:
     static constexpr int kTile = MapaDeTiles::kTile;
     static constexpr float kVelocidade = 96.0f;
     static constexpr float kAmplitudeTremor = 4.2f;  // em unidades de mundo
+    static constexpr float kZoom = 2.0f;
+    /// Para onde o zoom vai enquanto a cortina fecha sobre o painel.
+    static constexpr float kZoomConsole = 3.1f;
 
     /// Move o jogador resolvendo colisao contra os tiles, um eixo por vez.
     void moverComColisao(SDL_FPoint deslocamento);
     SDL_FRect caixaDoJogador(SDL_FPoint centro) const;
     SDL_FRect limitesDoMundo() const;
     bool pertoDoConsole() const;
+    /// Inclina a camera sobre o painel na mesma medida em que a cortina fecha.
+    void aproximarDoConsole(float dt);
 
     MapaDeTiles mapa_;
     Camera camera_;
     Flight voo_;
+    Transicao transicao_;
 
     SDL_FPoint posicao_{0.0f, 0.0f};
     SDL_FPoint posicaoAnterior_{0.0f, 0.0f};

@@ -71,6 +71,9 @@ void SceneStack::aplicarPendentes(Context& ctx) {
                 if (!pilha_.empty()) {
                     pilha_.back()->aoSair(ctx);
                     pilha_.pop_back();
+                    if (!pilha_.empty()) {
+                        pilha_.back()->aoRetomar(ctx);
+                    }
                 }
                 break;
 

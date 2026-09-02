@@ -99,7 +99,17 @@ interior sempre sobrevive à cabine.
 do quadro, então uma cena pode trocar a si mesma durante o próprio `atualizar()`.
 `bloqueiaUpdate()` e `bloqueiaRender()` decidem se as cenas abaixo continuam
 simulando e aparecendo (`PauseScene` congela sem esconder; `FlightScene` cobre o
-interior por inteiro).
+interior por inteiro). Depois de um `desempilhar`, quem voltou ao topo recebe
+`aoRetomar`.
+
+**A passagem convés ↔ cabine é uma cortina, não uma cena.** `Transicao` é
+membro das duas cenas e é desenhada por cima do próprio HUD de cada uma: a saída
+fecha e **fica fechada** até a cena de destino abrir a entrada a partir dela, e
+a troca de cena acontece no passo em que a tela ficou coberta. Não transforme
+isso em cena de overlay: ela teria que sobreviver à troca da cena de baixo (a
+pilha só mexe no topo) e, no topo, tomaria de quem está embaixo o passo do voo.
+Enquanto a cortina está em cena, nenhuma tecla é lida — mas `Flight::atualizar`
+continua sendo chamado uma vez por passo.
 
 **Coordenadas.** Tudo é desenhado em 640×360 lógicos com letterbox; o `App` já
 converte as coordenadas de mouse dos eventos. Não escreva em pixels de janela.

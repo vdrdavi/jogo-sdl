@@ -16,6 +16,10 @@ public:
 
     virtual void aoEntrar(Context&) {}
     virtual void aoSair(Context&) {}
+    /// A cena de cima desempilhou e esta voltou a ser o topo. E o gancho que
+    /// falta ao par aoEntrar/aoSair: quem empilha sabe quando saiu de cena, mas
+    /// nao quando volta (a InteriorScene reabre a cortina daqui).
+    virtual void aoRetomar(Context&) {}
 
     /// Eventos brutos; so a cena do topo recebe.
     virtual void aoEvento(Context&, const SDL_Event&) {}

@@ -68,6 +68,15 @@ escondê-la, e como a `FlightScene` cobre o interior da nave por inteiro.
 As transições (`empilhar`, `desempilhar`, `substituir`) são **adiadas para o fim
 do quadro**, então uma cena pode trocar a si mesma com segurança durante o
 próprio `atualizar()` — é exatamente o que a `InteriorScene` faz ao apertar E.
+Depois de um `desempilhar`, a cena que voltou a ser o topo recebe `aoRetomar`.
+
+A passagem entre o convés e a cabine não é um corte: cada uma das duas cenas
+guarda uma [`Transicao`](../src/scenes/Transicao.hpp) e a desenha por cima de si
+mesma. A cortina fecha sobre o painel (com a câmera do convés dando zoom nele),
+a cena só troca quando a tela está coberta, e do outro lado a mesma cor abre.
+Ela é **estado de cena, não uma cena de overlay**: uma cena teria que sobreviver
+à troca da cena de baixo — coisa que uma pilha não faz — e, ocupando o topo,
+tiraria de quem está embaixo o passo de simulação do voo.
 
 Cadastre o `.cpp` novo na lista de fontes do `CMakeLists.txt`.
 
