@@ -61,15 +61,13 @@ void MenuScene::desenhar(Context& ctx, float /*alpha*/) {
     const float meio = static_cast<float>(App::kLarguraLogica) * 0.5f;
 
     // O espacamento sai da altura de linha da fonte, para o layout acompanhar
-    // uma eventual troca do atlas.
-    const float yTitulo = 52.0f;
-    const float ySubtitulo = yTitulo + ctx.fonte.alturaLinha(3.0f) + 8.0f;
-    const float yPrimeiroItem = 165.0f;
+    // uma eventual troca do atlas. Sem titulo, o bloco de itens e o unico
+    // conteudo da tela: a posicao dele vem da propria altura, senao ele fica
+    // onde o titulo o empurrava e a tela nasce vazia em cima.
     const float espacoItem = ctx.fonte.alturaLinha(2.0f) + 10.0f;
-
-    ctx.fonte.desenharCentralizado(ctx.renderer, "JOGO SDL3", meio, yTitulo, kCorTitulo, 3.0f);
-    ctx.fonte.desenharCentralizado(ctx.renderer, "base de projeto", meio, ySubtitulo, kCorRodape,
-                                   1.0f);
+    const float alturaBloco =
+        espacoItem * static_cast<float>(kRotulos.size() - 1) + ctx.fonte.alturaLinha(2.0f);
+    const float yPrimeiroItem = (static_cast<float>(App::kAlturaLogica) - alturaBloco) * 0.5f;
 
     for (std::size_t i = 0; i < kRotulos.size(); ++i) {
         const bool ativo = static_cast<int>(i) == selecao_;

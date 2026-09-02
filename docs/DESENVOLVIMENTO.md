@@ -504,6 +504,25 @@ ela nasce já com o atraso de regime.
 
 ---
 
+### 2026-09-02 — A tela inicial sem título
+
+**Pedido:** tirar o título e o subtítulo do menu.
+
+A remoção em si é de duas linhas. O que veio junto é um detalhe de layout: o
+bloco de opções começava em uma coordenada fixa (`y = 165`), escolhida na época
+para cair **abaixo** do título. Sem o título, a metade de cima nascia vazia e o
+menu ficava encostado embaixo — a captura de conferência mostrou isso de cara.
+
+A posição passou a sair da altura do próprio bloco,
+`(altura da tela − altura do bloco) / 2`, com a altura do bloco calculada a
+partir da métrica da fonte (`alturaLinha`) e da quantidade de itens. É a mesma
+razão pela qual o espaçamento entre itens já era calculado assim e não fixo:
+trocar o atlas da fonte muda a célula, e o layout tem que acompanhar sozinho
+(já aconteceu — a célula foi de 11×18 para 8×16).
+
+**Verificação:** captura da tela inicial. Com a célula atual (8×16), o bloco
+ocupa de 122 a 238 dos 360 pixels lógicos de altura — centrado.
+
 ## Glossário
 
 | Termo | O que é |
