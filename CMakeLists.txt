@@ -53,12 +53,44 @@ elseif(MSVC)
     target_compile_options(jogo PRIVATE /W4)
 endif()
 
-# Copia os assets para junto do binario a cada build, para o jogo rodar de qualquer cwd.
-add_custom_command(TARGET jogo POST_BUILD
+# Copia os assets para junto do binario, para o jogo rodar de qualquer cwd.
+#
+# A copia depende dos ARQUIVOS de assets, nao do alvo: amarrada a um POST_BUILD
+# do "jogo", ela so rodaria quando o executavel fosse religado, e mudar apenas
+# um asset (regerar uma textura, editar um WAV) nao mexe em nenhum .cpp. A copia
+# em build/<preset>/assets/ ficaria velha e o jogo carregaria o asset antigo,
+# porque jogo::paths::assetsRoot() prefere o diretorio do binario.
+#
+# CONFIGURE_DEPENDS faz o CMake se reconfigurar sozinho quando um arquivo e
+# adicionado ou removido de assets/.
+file(GLOB_RECURSE ARQUIVOS_DE_ASSETS CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
+
+# A lista de assets tambem vira uma dependencia, em arquivo. Sem ela, REMOVER um
+# asset nao dispararia a copia: o ninja compara a data das entradas que restaram
+# com a do carimbo, e nenhuma delas ficou mais nova. file(CONFIGURE) so reescreve
+# quando o conteudo muda, entao isso nao suja o build incremental.
+set(LISTA_DE_ASSETS "${CMAKE_CURRENT_BINARY_DIR}/assets.list")
+string(REPLACE ";" "\n" CONTEUDO_DA_LISTA "${ARQUIVOS_DE_ASSETS}")
+file(CONFIGURE OUTPUT "${LISTA_DE_ASSETS}" CONTENT "${CONTEUDO_DA_LISTA}\n")
+
+# O destino e apagado antes de copiar porque copy_directory faz merge: sem isso,
+# um asset removido de assets/ sobreviveria na copia e o jogo continuaria
+# achando um arquivo que nao existe mais nas fontes.
+set(CARIMBO_DE_ASSETS "${CMAKE_CURRENT_BINARY_DIR}/assets.stamp")
+add_custom_command(
+    OUTPUT "${CARIMBO_DE_ASSETS}"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "$<TARGET_FILE_DIR:jogo>/assets"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/assets"
             "$<TARGET_FILE_DIR:jogo>/assets"
-    COMMENT "Copiando assets para o diretorio do executavel")
+    COMMAND ${CMAKE_COMMAND} -E touch "${CARIMBO_DE_ASSETS}"
+    DEPENDS ${ARQUIVOS_DE_ASSETS} "${LISTA_DE_ASSETS}"
+    COMMENT "Copiando assets para o diretorio do executavel"
+    VERBATIM)
+
+add_custom_target(assets ALL DEPENDS "${CARIMBO_DE_ASSETS}")
+add_dependencies(jogo assets)
 
 include(GNUInstallDirs)
 install(TARGETS jogo RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
