@@ -22,10 +22,6 @@ float aproximar(float atual, float alvo, float taxa, float dt) {
     return atual + (alvo - atual) * (1.0f - std::exp(-taxa * dt));
 }
 
-float interpolarAngulo(float anterior, float atual, float alpha) {
-    return anterior + (atual - anterior) * alpha;
-}
-
 /// Brilho radial aditivo (leque de triangulos) usado no escapamento do motor.
 void brilhoAditivo(SDL_Renderer* renderer, SDL_FPoint centro, float raio, SDL_FColor cor) {
     constexpr int kSegmentos = 12;
@@ -60,63 +56,41 @@ void brilhoAditivo(SDL_Renderer* renderer, SDL_FPoint centro, float raio, SDL_FC
 
 }  // namespace
 
-FlightScene::FlightScene()
-    : cena_(static_cast<float>(App::kLarguraLogica), static_cast<float>(App::kAlturaLogica)) {}
+FlightScene::FlightScene(Flight& voo)
+    : voo_(voo),
+      cena_(static_cast<float>(App::kLarguraLogica), static_cast<float>(App::kAlturaLogica)) {}
 
 void FlightScene::aoEntrar(Context& ctx) {
     nave_ = criarNaveLowPoly();
     // Semente fixa: o mesmo setor estelar em toda partida.
     estrelas_.gerar(0xC0FFEEu, 1800, 150.0f);
-    rochas_.gerar(0xA57E01Du, kQuantidadeRochas, kRaioCampo);
     cena_.definirNevoa(SDL_FColor{kCorEspaco.r / 255.0f, kCorEspaco.g / 255.0f,
                                   kCorEspaco.b / 255.0f, 1.0f},
-                       kNevoaInicio, kRaioCampo);
+                       kNevoaInicio, voo_.rochas().raio());
 
-    pose_ = Pose{};
-    pose_.camera = Vec3{0.0f, 1.4f, 5.0f};
-    poseAnterior_ = pose_;
-    velocidade_ = kVelocidadeCruzeiro;
+    // A nave ja estava voando quando a cabine abriu, entao a camera nasce onde
+    // ela estaria se ja viesse perseguindo: no regime, perseguir a taxa k um
+    // alvo que corre a v deixa a camera velocidade/k atras dele. Sem isso a
+    // cabine abre colada na nave e recua sozinha no primeiro meio segundo.
+    const Mat3 rotacao = Flight::rotacaoDe(voo_.pose());
+    camera_ = voo_.pose().posicao + rotacao * Vec3{0.0f, 1.4f, 5.0f} -
+              rotacao.frente() * (voo_.velocidade() / kPerseguicaoCamera);
+    cameraAnterior_ = camera_;
+    cameraCima_ = rotacao.cima();
+    estrelas_.centralizar(camera_);
+
     fov_ = kFovBase;
-    batida_ = 0.0f;
-
-    estrelas_.centralizar(pose_.camera);
-    rochas_.centralizar(pose_.posicao);
     somSaida_ = ctx.audio.carregar("audio/back.wav");
-
-    // Ruido marrom em loop: o "la fora" da cena de voo. Comeca mudo e sobe em
-    // atualizar(), para a troca de cena nao estourar um rugido do nada.
-    ambiente_ = 0.0f;
-    somAmbiente_ = ctx.audio.carregar("audio/espaco.wav");
-    somImpacto_ = ctx.audio.carregar("audio/impacto.wav");
-    vozAmbiente_ = ctx.audio.tocarEmLoop(somAmbiente_, ambiente_);
+    voo_.definirAbafado(false);
 }
 
-void FlightScene::aoSair(Context& ctx) {
-    ctx.audio.parar(vozAmbiente_, kAmbienteSaida);
-    vozAmbiente_ = 0;
-}
-
-float FlightScene::fatorTurbo() const {
-    return (velocidade_ - kVelocidadeCruzeiro) / (kVelocidadeTurbo - kVelocidadeCruzeiro);
-}
-
-void FlightScene::checarColisao(Context& ctx) {
-    const int atingida = rochas_.colisao(pose_.posicao, kRaioNave);
-    if (atingida < 0) {
-        return;
-    }
-
-    // A rocha vai para outro canto do cubo em vez de sumir: o campo mantem a
-    // mesma densidade sem alocar nada.
-    rochas_.reposicionar(atingida, pose_.posicao);
-    ctx.audio.tocar(somImpacto_);
-    velocidade_ = kVelocidadeAposBatida;
-    batida_ = 1.0f;
+void FlightScene::aoSair(Context&) {
+    // O voo continua sem a cabine; o que muda e o casco voltar a abafar.
+    voo_.definirAbafado(true);
 }
 
 void FlightScene::atualizar(Context& ctx, float dt) {
     tempo_ += dt;
-    poseAnterior_ = pose_;
 
     if (ctx.input.acaoPressionada(Acao::Voltar) || ctx.input.acaoPressionada(Acao::Pausar)) {
         ctx.audio.tocar(somSaida_);
@@ -124,58 +98,40 @@ void FlightScene::atualizar(Context& ctx, float dt) {
         return;
     }
 
-    const SDL_FPoint entrada = ctx.input.eixoMovimento();
+    Flight::Comando comando;
+    comando.eixo = ctx.input.eixoMovimento();
+    comando.turbo = ctx.input.acaoAtiva(Acao::Confirmar);
+    voo_.atualizar(ctx, dt, comando);
 
-    // Curva inclinada: o rolamento acompanha a guinada, como em um caca.
-    pose_.roll = aproximar(pose_.roll, -entrada.x * 0.85f, 6.0f, dt);
-    pose_.yaw -= entrada.x * kTaxaGiro * dt;
-    pose_.pitch = std::clamp(pose_.pitch - entrada.y * kTaxaPitch * dt, -kLimitePitch, kLimitePitch);
-
-    turbo_ = ctx.input.acaoAtiva(Acao::Confirmar);
-    velocidade_ = aproximar(velocidade_, turbo_ ? kVelocidadeTurbo : kVelocidadeCruzeiro, 3.0f, dt);
-    fov_ = aproximar(fov_, turbo_ ? kFovTurbo : kFovBase, 4.0f, dt);
-
-    const Mat3 rotacao = Mat3::deEuler(pose_.yaw, pose_.pitch, pose_.roll);
-    pose_.posicao += rotacao.frente() * velocidade_ * dt;
+    fov_ = aproximar(fov_, voo_.turbo() ? kFovTurbo : kFovBase, 4.0f, dt);
 
     // Camera de terceira pessoa com atraso: da peso as manobras.
-    const Vec3 desejada = pose_.posicao + rotacao * Vec3{0.0f, 1.4f, 5.0f};
-    pose_.camera = lerp(pose_.camera, desejada, 1.0f - std::exp(-9.0f * dt));
+    const Mat3 rotacao = Flight::rotacaoDe(voo_.pose());
+    cameraAnterior_ = camera_;
+    const Vec3 desejada = voo_.pose().posicao + rotacao * Vec3{0.0f, 1.4f, 5.0f};
+    camera_ = lerp(camera_, desejada, 1.0f - std::exp(-kPerseguicaoCamera * dt));
     cameraCima_ = normalizar(lerp(cameraCima_, rotacao.cima(), 1.0f - std::exp(-6.0f * dt)));
 
-    // Campos infinitos: estrelas em torno da camera, rochas em torno da nave --
-    // e a nave que colide com elas.
-    estrelas_.centralizar(pose_.camera);
-    rochas_.atualizar(dt);
-    rochas_.centralizar(pose_.posicao);
-    checarColisao(ctx);
-    batida_ = std::max(0.0f, batida_ - kDecaimentoBatida * dt);
-
-    // O ambiente entra do zero e depois acompanha o esforco do motor.
-    const float alvoAmbiente =
-        kAmbienteCruzeiro + (kAmbienteTurbo - kAmbienteCruzeiro) * fatorTurbo();
-    ambiente_ = aproximar(ambiente_, alvoAmbiente, kTaxaAmbiente, dt);
-    ctx.audio.ajustarGanho(vozAmbiente_, ambiente_);
+    // Campo infinito: as estrelas sao reposicionadas em torno da camera.
+    estrelas_.centralizar(camera_);
 }
 
 void FlightScene::desenhar(Context& ctx, float alpha) {
     // Estado interpolado entre os dois ultimos passos fixos.
-    const Vec3 posicao = lerp(poseAnterior_.posicao, pose_.posicao, alpha);
-    const float yaw = interpolarAngulo(poseAnterior_.yaw, pose_.yaw, alpha);
-    const float pitch = interpolarAngulo(poseAnterior_.pitch, pose_.pitch, alpha);
-    const float roll = interpolarAngulo(poseAnterior_.roll, pose_.roll, alpha);
-    const Mat3 rotacao = Mat3::deEuler(yaw, pitch, roll);
+    const Flight::Pose pose = voo_.interpolada(alpha);
+    const Vec3 posicao = pose.posicao;
+    const Mat3 rotacao = Flight::rotacaoDe(pose);
 
     Camera3D camera;
-    camera.posicao = lerp(poseAnterior_.camera, pose_.camera, alpha);
+    camera.posicao = lerp(cameraAnterior_, camera_, alpha);
     camera.orientacao =
         Mat3::olhandoPara(posicao + rotacao.frente() * 14.0f - camera.posicao, cameraCima_);
     camera.fovGraus = fov_;
 
     // Tremor da batida: o olho sacode, a mira nao -- por isso a sacudida entra
     // depois da orientacao, deslocando so a posicao nos eixos da tela.
-    if (batida_ > 0.0f) {
-        const float amplitude = kAmplitudeTremor * batida_ * batida_;
+    if (voo_.batida() > 0.0f) {
+        const float amplitude = kAmplitudeTremor * voo_.batida() * voo_.batida();
         camera.posicao += camera.orientacao.direita() * (std::sin(tempo_ * 61.0f) * amplitude) +
                           camera.orientacao.cima() * (std::sin(tempo_ * 43.0f) * amplitude);
     }
@@ -189,9 +145,9 @@ void FlightScene::desenhar(Context& ctx, float alpha) {
                                   static_cast<float>(App::kAlturaLogica)},
                         kCorEspaco);
 
-    estrelas_.desenhar(ctx.renderer, cena_, rotacao.frente() * velocidade_, tempo_);
+    estrelas_.desenhar(ctx.renderer, cena_, rotacao.frente() * voo_.velocidade(), tempo_);
 
-    rochas_.submeter(cena_);
+    voo_.rochas().submeter(cena_);
     cena_.submeter(nave_, posicao, rotacao, 1.15f);
     cena_.desenhar(ctx.renderer);
 
@@ -199,7 +155,7 @@ void FlightScene::desenhar(Context& ctx, float alpha) {
     SDL_FPoint motor;
     float profundidade = 0.0f;
     if (cena_.projetar(posicao + rotacao * Vec3{0.0f, 0.05f, 1.75f}, motor, &profundidade)) {
-        const float intensidade = 0.35f + 0.65f * fatorTurbo();
+        const float intensidade = 0.35f + 0.65f * voo_.fatorTurbo();
         const float tremor = 0.9f + 0.1f * std::sin(tempo_ * 30.0f);
         brilhoAditivo(ctx.renderer, motor, cena_.escalaEmTela(profundidade) * 0.55f * tremor,
                       SDL_FColor{1.0f * intensidade, 0.55f * intensidade, 0.22f * intensidade,
@@ -207,8 +163,9 @@ void FlightScene::desenhar(Context& ctx, float alpha) {
     }
 
     // Clarao da batida por cima da cena, antes do HUD.
-    if (batida_ > 0.0f) {
-        const Uint8 alfa = static_cast<Uint8>(std::clamp(batida_ * batida_ * 62.0f, 0.0f, 255.0f));
+    if (voo_.batida() > 0.0f) {
+        const Uint8 alfa =
+            static_cast<Uint8>(std::clamp(voo_.batida() * voo_.batida() * 62.0f, 0.0f, 255.0f));
         draw::retanguloTela(ctx.renderer,
                             SDL_FRect{0.0f, 0.0f, static_cast<float>(App::kLarguraLogica),
                                       static_cast<float>(App::kAlturaLogica)},
@@ -226,13 +183,13 @@ void FlightScene::desenhar(Context& ctx, float alpha) {
 
     // HUD
     char linha[64];
-    std::snprintf(linha, sizeof(linha), "VEL %3.0f u/s%s", static_cast<double>(velocidade_),
-                  turbo_ ? "  [TURBO]" : "");
+    std::snprintf(linha, sizeof(linha), "VEL %3.0f u/s%s",
+                  static_cast<double>(voo_.velocidade()), voo_.turbo() ? "  [TURBO]" : "");
     const SDL_FPoint tamanho = ctx.fonte.medir(linha, 1.0f);
     draw::retanguloTela(ctx.renderer, SDL_FRect{8.0f, 8.0f, tamanho.x + 16.0f, tamanho.y + 12.0f},
                         kCorPainel);
     ctx.fonte.desenhar(ctx.renderer, linha, 16.0f, 14.0f,
-                       turbo_ ? SDL_Color{255, 200, 130, 255} : kCorHud, 1.0f);
+                       voo_.turbo() ? SDL_Color{255, 200, 130, 255} : kCorHud, 1.0f);
 
     const char* dica = ctx.input.temGamepad()
                            ? "analogico: pilotar   A: turbo   B: voltar   desvie das rochas"

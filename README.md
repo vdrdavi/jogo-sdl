@@ -73,12 +73,16 @@ Bater custa quase toda a velocidade, sacode a câmera, dá um clarão quente e
 manda a rocha para outro canto do cubo: a densidade do campo não muda e nada é
 alocado durante o voo.
 
+O voo não é a tela do voo: ele é estado da viagem (`sim/Flight.*`) e continua
+acontecendo enquanto o jogador anda pelo convés — a nave segue reto no piloto
+automático e pode bater, e aí o convés inteiro sacode.
+
 ## Som
 
 Sem `SDL3_mixer`: cada reprodução é um `SDL_AudioStream` ligado ao dispositivo,
-que faz a mixagem. Além dos efeitos, o voo tem um ambiente em *loop* — ruído
-marrom cujo ganho acompanha o esforço do motor, entrando do zero e saindo em
-*fade* ao deixar a cena.
+que faz a mixagem. Além dos efeitos, a viagem tem um ambiente em *loop* — ruído
+marrom cujo ganho acompanha o esforço do motor. Ele toca do convés à cabine,
+abafado enquanto o casco está no caminho, e entra e sai em rampa.
 
 O WAV do ambiente é gerado em `tools/gen_assets.py` por um integrador com
 vazamento rodado **em círculo**: uma passada só para aquecer o estado e outra

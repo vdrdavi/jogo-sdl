@@ -50,6 +50,17 @@ as bordas (`acaoPressionada`) em quadros sem update — com a tela a 240 Hz e a
 simulação a 60 Hz, três de cada quatro quadros não chamam `atualizar()`. Se mexer
 no laço, preserve essa relação.
 
+**O voo não é uma cena.** `Flight` (`src/sim/Flight.*`) guarda pose, velocidade,
+campo de rochas, colisão e o ambiente sonoro, e vive na `InteriorScene` — a nave
+continua voando enquanto o piloto anda lá dentro. Quem chama `Flight::atualizar`
+é a cena ativa: a `FlightScene` com o comando do jogador, a `InteriorScene` com
+`Comando{}` (piloto automático, sem código extra: sem entrada tudo tende a
+seguir reto). Como a `FlightScene` bloqueia o update da de baixo, o voo avança
+**exatamente um passo por passo fixo** nos dois casos — se mexer nisso, confira
+que continua assim. A `FlightScene` guarda uma referência para o `Flight` da
+cena de baixo; isso é seguro porque a pilha só desempilha do topo, então o
+interior sempre sobrevive à cabine.
+
 **Pilha de cenas.** `empilhar`/`desempilhar`/`substituir` são adiados para o fim
 do quadro, então uma cena pode trocar a si mesma durante o próprio `atualizar()`.
 `bloqueiaUpdate()` e `bloqueiaRender()` decidem se as cenas abaixo continuam
@@ -96,7 +107,10 @@ métrica da célula (já aconteceu: 11×18 → 8×16).
 mapeamento para teclado e gamepad vive numa tabela única no topo de
 `src/input/Input.cpp`, na mesma ordem do enum.
 
-**Áudio.** Sem SDL3_mixer: cada reprodução é um `SDL_AudioStream` ligado ao
+**Áudio.** O ambiente do lado de fora toca a viagem inteira, abafado por um
+ganho menor enquanto o jogador está no convés (`Flight::definirAbafado`); a
+rampa que faz a passagem entre convés e cabine ser um swell fica no `Flight`,
+não na cena, senão a troca de cena viraria um degrau. Sem SDL3_mixer: cada reprodução é um `SDL_AudioStream` ligado ao
 dispositivo, que faz a mixagem, com carência de 250 ms antes de recolher a voz
 para não cortar o fim do som. Um loop (`tocarEmLoop`) é a mesma voz reabastecida
 em `atualizar()` enquanto a fila do fluxo estiver com menos de meio segundo, e é

@@ -30,6 +30,7 @@ add_executable(jogo
     src/gfx/BitmapFont.cpp
     src/audio/Audio.cpp
     src/scene/SceneStack.cpp
+    src/sim/Flight.cpp
     src/gfx3d/AsteroidField.cpp
     src/gfx3d/Mesh.cpp
     src/gfx3d/Renderer3D.cpp

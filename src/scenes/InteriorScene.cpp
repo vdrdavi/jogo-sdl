@@ -1,5 +1,6 @@
 #include "scenes/InteriorScene.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 #include "core/App.hpp"
@@ -143,11 +144,24 @@ void InteriorScene::aoEntrar(Context& ctx) {
     camera_.definirZoom(2.0f);
     camera_.definirPosicao(posicao_);
     camera_.limitarA(mundo);
+
+    // A viagem comeca aqui e dura enquanto esta cena existir: o campo de rochas
+    // e o ambiente do lado de fora nao pertencem a cabine.
+    voo_.iniciar(ctx, 0xA57E01Du);
+}
+
+void InteriorScene::aoSair(Context& ctx) {
+    voo_.encerrar(ctx);
 }
 
 void InteriorScene::atualizar(Context& ctx, float dt) {
     tempo_ += dt;
     posicaoAnterior_ = posicao_;
+
+    // Piloto automatico: sem comando, a nave segue reto -- e ainda pode bater.
+    // Fica antes das saidas antecipadas para o voo nao perder passos; quando a
+    // FlightScene esta no topo, ela e quem chama isto (e esta cena nem roda).
+    voo_.atualizar(ctx, dt, Flight::Comando{});
 
     if (ctx.input.acaoPressionada(Acao::Pausar)) {
         ctx.cenas.empilhar(std::make_unique<PauseScene>());
@@ -156,7 +170,7 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
 
     if (pertoDoConsole() && ctx.input.acaoPressionada(Acao::Interagir)) {
         ctx.audio.tocar(somConfirmar_);
-        ctx.cenas.empilhar(std::make_unique<FlightScene>());
+        ctx.cenas.empilhar(std::make_unique<FlightScene>(voo_));
         return;
     }
 
@@ -174,15 +188,27 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
 }
 
 void InteriorScene::desenhar(Context& ctx, float alpha) {
+    // Tremor da batida: a nave levou o tranco e o convés inteiro sacode. A
+    // sacudida entra so aqui, numa copia da camera, para nao realimentar o
+    // seguidor -- somada em camera_ ela viraria deriva no passo seguinte.
+    Camera camera = camera_;
+    if (voo_.batida() > 0.0f) {
+        const float amplitude = kAmplitudeTremor * voo_.batida() * voo_.batida();
+        camera.definirPosicao(
+            SDL_FPoint{camera.posicao().x + std::sin(tempo_ * 61.0f) * amplitude,
+                       camera.posicao().y + std::sin(tempo_ * 43.0f) * amplitude});
+    }
+
     // Conves
     if (tiles_ != nullptr) {
-        const SDL_FRect visivel = camera_.areaVisivel();
-        const int x0 = SDL_max(0, static_cast<int>(std::floor(visivel.x / kTile)));
-        const int y0 = SDL_max(0, static_cast<int>(std::floor(visivel.y / kTile)));
-        const int x1 = SDL_min(kLarguraMapa - 1,
-                               static_cast<int>(std::ceil((visivel.x + visivel.w) / kTile)));
-        const int y1 = SDL_min(kAlturaMapa - 1,
-                               static_cast<int>(std::ceil((visivel.y + visivel.h) / kTile)));
+        const SDL_FRect visivel = camera.areaVisivel();
+        // O intervalo nao e mais grampeado ao mapa: fora dele o tile da borda
+        // se repete (a busca e que e grampeada), entao o casco continua em vez
+        // de abrir um vazio preto quando o tremor empurra a camera para fora.
+        const int x0 = static_cast<int>(std::floor(visivel.x / kTile));
+        const int y0 = static_cast<int>(std::floor(visivel.y / kTile));
+        const int x1 = static_cast<int>(std::ceil((visivel.x + visivel.w) / kTile));
+        const int y1 = static_cast<int>(std::ceil((visivel.y + visivel.h) / kTile));
 
         Sprite tile;
         tile.textura = tiles_;
@@ -191,10 +217,12 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
 
         for (int y = y0; y <= y1; ++y) {
             for (int x = x0; x <= x1; ++x) {
-                const Uint8 indice = mapa_[static_cast<std::size_t>(y * kLarguraMapa + x)];
+                const int mx = std::clamp(x, 0, kLarguraMapa - 1);
+                const int my = std::clamp(y, 0, kAlturaMapa - 1);
+                const Uint8 indice = mapa_[static_cast<std::size_t>(my * kLarguraMapa + mx)];
                 tile.recorte = SDL_FRect{static_cast<float>(indice * kTile), 0.0f,
                                          static_cast<float>(kTile), static_cast<float>(kTile)};
-                draw::sprite(ctx.renderer, camera_, tile,
+                draw::sprite(ctx.renderer, camera, tile,
                              SDL_FPoint{static_cast<float>(x * kTile),
                                         static_cast<float>(y * kTile)});
             }
@@ -202,27 +230,27 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
     }
 
     // Console + brilho pulsante das telas
-    draw::sprite(ctx.renderer, camera_, consoleSprite_, SDL_FPoint{console_.x, console_.y});
+    draw::sprite(ctx.renderer, camera, consoleSprite_, SDL_FPoint{console_.x, console_.y});
     const float pulso = 0.5f + 0.5f * std::sin(tempo_ * 2.2f);
-    draw::retanguloMundo(ctx.renderer, camera_,
+    draw::retanguloMundo(ctx.renderer, camera,
                          SDL_FRect{console_.x + 2.0f, console_.y + 8.0f, console_.w - 4.0f, 14.0f},
                          SDL_Color{90, 190, 240, static_cast<Uint8>(24.0f + pulso * 34.0f)});
 
     // Jogador
     const SDL_FPoint desenhada = interpolar(posicaoAnterior_, posicao_, alpha);
-    draw::retanguloMundo(ctx.renderer, camera_,
+    draw::retanguloMundo(ctx.renderer, camera,
                          SDL_FRect{desenhada.x - 9.0f, desenhada.y - 2.0f, 18.0f, 5.0f},
                          SDL_Color{0, 0, 0, 80});
     Sprite jogador = jogador_;
     jogador.espelho = espelho_;
-    draw::sprite(ctx.renderer, camera_, jogador,
+    draw::sprite(ctx.renderer, camera, jogador,
                  SDL_FPoint{desenhada.x, desenhada.y + std::sin(tempo_ * 5.0f) * 0.8f});
 
     // Convite de interacao, ancorado no console e em coordenadas de tela.
     if (pertoDoConsole()) {
         const char* convite = "[E] Assumir os controles";
         const SDL_FPoint acima =
-            camera_.mundoParaTela(SDL_FPoint{console_.x + console_.w * 0.5f, console_.y - 6.0f});
+            camera.mundoParaTela(SDL_FPoint{console_.x + console_.w * 0.5f, console_.y - 6.0f});
         const SDL_FPoint tamanho = ctx.fonte.medir(convite, 1.0f);
         const float subida = std::sin(tempo_ * 4.0f) * 1.5f;
 
