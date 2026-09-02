@@ -28,6 +28,12 @@ public:
     void definirCamera(const Camera3D& camera);
     const Camera3D& camera() const { return camera_; }
 
+    /// Faz as faces se dissolverem na cor do fundo entre `inicio` e `fim`
+    /// (distancias em Z). Sem isso um objeto de um campo com wrap aparece
+    /// inteiro na borda do campo; com isso ele emerge do vazio. `fim <= inicio`
+    /// desliga a nevoa.
+    void definirNevoa(SDL_FColor cor, float inicio, float fim);
+
     /// Comeca um novo quadro (descarta o lote anterior).
     void iniciarQuadro() { faces_.clear(); }
 
@@ -66,6 +72,10 @@ private:
     float largura_{640.0f};
     float altura_{360.0f};
     float distanciaFocal_{300.0f};
+
+    SDL_FColor nevoaCor_{0.0f, 0.0f, 0.0f, 1.0f};
+    float nevoaInicio_{0.0f};
+    float nevoaFim_{0.0f};
 
     std::vector<FaceProjetada> faces_;
     std::vector<SDL_Vertex> saida_;

@@ -310,6 +310,23 @@ def gerar_ambiente(nome: str, duracao: float = 4.0, taxa: int = 22050,
     print(f"{nome}: {duracao:.1f} s @ {taxa} Hz em loop (ruido marrom)")
 
 
+def gerar_impacto(nome: str, duracao: float = 0.5, taxa: int = 22050,
+                  corte: float = 110.0, semente: int = 0x1A9A) -> None:
+    """Baque: o mesmo ruido marrom, so que com decaimento rapido. Corte mais
+    alto que o do ambiente para o estouro ter corpo em vez de so rugir."""
+    total = int(taxa * duracao)
+    marrom = ruido_marrom(total, taxa, corte, semente)
+
+    pico = max(abs(v) for v in marrom) or 1.0
+    amostras = []
+    for i, v in enumerate(marrom):
+        t = i / taxa
+        ataque = min(1.0, t / 0.003)
+        amostras.append(v / pico * 0.9 * ataque * math.exp(-t * 9.0))
+    escrever_wav(nome, amostras, taxa)
+    print(f"{nome}: {duracao * 1000:.0f} ms (baque de ruido marrom)")
+
+
 def main() -> None:
     for sub in ("textures", "fonts", "audio"):
         (ASSETS / sub).mkdir(parents=True, exist_ok=True)
@@ -322,6 +339,7 @@ def main() -> None:
     gerar_wav("confirm.wav", 990.0, 0.14)
     gerar_wav("back.wav", 330.0, 0.12)
     gerar_ambiente("espaco.wav")
+    gerar_impacto("impacto.wav")
 
 
 if __name__ == "__main__":

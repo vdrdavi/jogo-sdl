@@ -29,4 +29,9 @@ void orientarFacesParaFora(Mesh& malha);
 /// Caca triangular low poly, com o nariz em -Z (a frente de Mat3).
 Mesh criarNaveLowPoly();
 
+/// Rocha irregular a partir de uma semente. Os vertices sao normalizados para
+/// o maior raio valer 1, entao a escala com que a malha e desenhada ja e o raio
+/// da esfera de colisao.
+Mesh criarAsteroideLowPoly(Uint32 semente);
+
 }  // namespace jogo

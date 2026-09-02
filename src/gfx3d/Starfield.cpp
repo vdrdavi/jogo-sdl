@@ -3,33 +3,14 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/Aleatorio.hpp"
+
 namespace jogo {
 namespace {
 
 /// Rastro em segundos: o quanto do deslocamento vira risco na tela.
 constexpr float kTempoRastro = 0.055f;
 constexpr float kTamanhoBase = 0.26f;
-
-/// xorshift32: barato e deterministico, o suficiente para espalhar estrelas.
-class Aleatorio {
-public:
-    explicit Aleatorio(Uint32 semente) : estado_(semente != 0 ? semente : 0x9E3779B9u) {}
-
-    Uint32 proximo() {
-        estado_ ^= estado_ << 13;
-        estado_ ^= estado_ >> 17;
-        estado_ ^= estado_ << 5;
-        return estado_;
-    }
-
-    /// Float uniforme em [0, 1).
-    float unitario() { return static_cast<float>(proximo() >> 8) / 16777216.0f; }
-
-    float entre(float minimo, float maximo) { return minimo + unitario() * (maximo - minimo); }
-
-private:
-    Uint32 estado_;
-};
 
 /// Cores por "temperatura": a maioria branca/azulada, poucas alaranjadas.
 SDL_FColor corEstelar(Aleatorio& rng) {

@@ -14,6 +14,7 @@ src/
 │  ├─ Paths.*            resolução do diretório de assets
 │  ├─ Context.hpp        referências dos subsistemas entregues às cenas
 │  ├─ SdlPtr.hpp         unique_ptr para os tipos do SDL
+│  ├─ Aleatorio.hpp      xorshift32 semeado (estrelas, rochas)
 │  └─ Log.hpp            macros de log com SDL_GetError()
 ├─ input/Input.*         ações lógicas, estados de borda, gamepad com hotplug
 ├─ gfx/
@@ -24,9 +25,10 @@ src/
 │  └─ BitmapFont.*       texto UTF-8 a partir de um atlas + .fnt
 ├─ gfx3d/
 │  ├─ Math3D.hpp         Vec3 e Mat3 (base ortonormal, Euler, olhar-para)
-│  ├─ Mesh.*             malha low poly com cor por face + a nave
-│  ├─ Renderer3D.*       projeção, recorte, culling, pintor, SDL_RenderGeometry
-│  └─ Starfield.*        campo de estrelas procedural com rastro
+│  ├─ Mesh.*             malha low poly com cor por face + a nave e as rochas
+│  ├─ Renderer3D.*       projeção, recorte, culling, névoa, pintor, RenderGeometry
+│  ├─ Starfield.*        campo de estrelas procedural com rastro
+│  └─ AsteroidField.*    campo de asteroides com wrap e colisão esfera-esfera
 ├─ audio/Audio.*         WAVs em memória, vozes (e loops) mixados pelo dispositivo
 ├─ scene/                Scene (interface) e SceneStack (transições adiadas)
 └─ scenes/               MenuScene, InteriorScene, FlightScene, PauseScene

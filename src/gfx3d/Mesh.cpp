@@ -1,5 +1,9 @@
 #include "gfx3d/Mesh.hpp"
 
+#include <algorithm>
+
+#include "core/Aleatorio.hpp"
+
 namespace jogo {
 namespace {
 
@@ -68,6 +72,47 @@ Mesh criarNaveLowPoly() {
 
     orientarFacesParaFora(nave);
     return nave;
+}
+
+Mesh criarAsteroideLowPoly(Uint32 semente) {
+    // Icosaedro: 12 vertices e 20 faces, o menor solido que ainda passa por
+    // rocha depois de amassado.
+    constexpr float t = 1.618034f;
+    Mesh rocha;
+    rocha.vertices = {
+        Vec3{-1.0f, t, 0.0f},  Vec3{1.0f, t, 0.0f},  Vec3{-1.0f, -t, 0.0f},
+        Vec3{1.0f, -t, 0.0f},  Vec3{0.0f, -1.0f, t}, Vec3{0.0f, 1.0f, t},
+        Vec3{0.0f, -1.0f, -t}, Vec3{0.0f, 1.0f, -t}, Vec3{t, 0.0f, -1.0f},
+        Vec3{t, 0.0f, 1.0f},   Vec3{-t, 0.0f, -1.0f}, Vec3{-t, 0.0f, 1.0f},
+    };
+    rocha.faces = {
+        {0, 11, 5}, {0, 5, 1},  {0, 1, 7},   {0, 7, 10}, {0, 10, 11},
+        {1, 5, 9},  {5, 11, 4}, {11, 10, 2}, {10, 7, 6}, {7, 1, 8},
+        {3, 9, 4},  {3, 4, 2},  {3, 2, 6},   {3, 6, 8},  {3, 8, 9},
+        {4, 9, 5},  {2, 4, 11}, {6, 2, 10},  {8, 6, 7},  {9, 8, 1},
+    };
+
+    Aleatorio rng(semente);
+    // Amassa cada vertice ao longo do proprio raio e normaliza pelo maior: o
+    // raio 1 e o que faz a escala do asteroide servir de raio de colisao.
+    float maior = 0.0f;
+    for (Vec3& v : rocha.vertices) {
+        v = normalizar(v) * rng.entre(0.62f, 1.10f);
+        maior = std::max(maior, comprimento(v));
+    }
+    for (Vec3& v : rocha.vertices) {
+        v = v * (1.0f / maior);
+    }
+
+    // Cinza terroso variando por face: sem textura, e o que tira a rocha da
+    // aparencia de solido chapado.
+    for (Mesh::Face& face : rocha.faces) {
+        const float tom = rng.entre(0.26f, 0.44f);
+        face.cor = SDL_FColor{tom * 1.10f, tom * 1.00f, tom * 0.86f, 1.0f};
+    }
+
+    orientarFacesParaFora(rocha);
+    return rocha;
 }
 
 }  // namespace jogo

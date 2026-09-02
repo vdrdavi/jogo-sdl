@@ -78,6 +78,15 @@ corrige o winding pela normal contra o centro da malha.
 com memória constante); o rastro sai de projetar a estrela deslocada de `+v·Δt`,
 porque a câmera é que andou.
 
+`AsteroidField` usa o mesmo cubo com wrap, com duas diferenças que não são
+enfeite: a rocha que atravessa a borda é **sorteada de novo** nos eixos que não
+viraram (wrap puro deixa o campo periódico — voando reto, as mesmas pedras
+voltam na mesma formação a cada travessia) e as malhas são normalizadas para
+raio 1, o que faz a escala de desenho ser também o raio da esfera de colisão. A
+névoa do `Renderer3D` (`definirNevoa`) existe para a rocha emergir do vazio em
+vez de aparecer inteira na borda do campo, e de quebra descarta as faces que já
+viraram a cor do fundo.
+
 **Texto.** `BitmapFont` lê um atlas PNG mais metadados `.fnt` gerados por
 `tools/gen_assets.py`; a ordem do charset no `.fnt` é o índice no atlas. Posicione
 texto com `medir()` e `alturaLinha()` em vez de constantes — trocar a fonte muda a

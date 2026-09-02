@@ -2,11 +2,11 @@
 
 Você anda pelo interior de uma nave em 2D, usa o painel de pilotagem do convés e
 a tela vira um voo 3D: um caça low poly atravessando um campo de estrelas gerado
-proceduralmente.
+proceduralmente, desviando de asteroides.
 
 ![Interior da nave: convés de tiles, janelas para o espaço e o painel de pilotagem com o convite para assumir os controles](docs/interior.png)
 
-![Voo 3D: o caça low poly triangular com as estrelas riscando a tela ao redor](docs/voo.png)
+![Voo 3D: o caça low poly triangular entre asteroides, com as estrelas riscando a tela ao redor](docs/voo.png)
 
 ## Dependências e build
 
@@ -59,6 +59,19 @@ de um cubo e, a cada quadro, reposiciona cada estrela por *wrap* em torno da
 câmera: um campo infinito com memória constante. O rastro sai de projetar a
 estrela deslocada de `velocidade * Δt` e desenhar um quadrilátero que desvanece
 na cauda, em blending aditivo.
+
+Os asteroides (`AsteroidField`) usam o mesmo cubo com *wrap*, só que com malhas:
+icosaedros amassados por um xorshift, normalizados para raio 1 — a escala de
+desenho é, portanto, o raio da esfera de colisão, e a colisão é uma comparação de
+distância contra a posição da nave. Quem atravessa a borda do cubo não volta na
+mesma formação: os eixos que não viraram são sorteados de novo, senão voar em
+linha reta traria as mesmas pedras de volta a cada travessia. A névoa do
+`Renderer3D` dissolve as faces na cor do vazio antes da borda, o que faz a rocha
+emergir em vez de aparecer — e ainda descarta de graça o que já virou fundo.
+
+Bater custa quase toda a velocidade, sacode a câmera, dá um clarão quente e
+manda a rocha para outro canto do cubo: a densidade do campo não muda e nada é
+alocado durante o voo.
 
 ## Som
 
