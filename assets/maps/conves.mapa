@@ -1,0 +1,40 @@
+# Conves da nave: o mapa de tiles do interior.
+#
+# Formato de texto, uma diretiva por linha, para editar o cenario sem
+# recompilar. Comentario e a linha inteira que comeca com '#' -- nunca um
+# rabicho no fim, porque '#' tambem e um simbolo da legenda.
+#
+#   legenda <caractere> <nome-do-tile>   liga um caractere da grade a um tile
+#   marcador <nome> <x> <y>              ponto nomeado, em tiles (aceita fracao)
+#   mapa                                 abre a grade: o resto do arquivo e ela
+#
+# Os nomes de tile validos e o que cada um faz (solido ou nao) sao definidos em
+# src/world/MapaDeTiles.cpp, junto com o indice de cada um no atlas
+# textures/interior.png. Todas as linhas da grade precisam ter o mesmo
+# comprimento.
+
+legenda . piso
+legenda , piso-escuro
+legenda = grade
+legenda # parede
+legenda - faixa
+legenda o janela
+
+# Canto superior esquerdo do painel de pilotagem. O sprite tem 3x2 tiles, e o
+# meio-tile centra o painel nos 20 tiles de largura do conves.
+marcador console 8.5 2
+
+mapa
+####################
+#-ooooo------ooooo-#
+#.....,..,......,..#
+#.,..,......,......#
+#,......,......,..,#
+#==.==.==.==.==.==.#
+#......,..,......,.#
+#..,..,......,.....#
+#.,......,......,..#
+#....,......,..,...#
+#==.==.==.==.==.==,#
+#...,..,......,....#
+####################

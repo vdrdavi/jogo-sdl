@@ -523,6 +523,144 @@ trocar o atlas da fonte muda a célula, e o layout tem que acompanhar sozinho
 **Verificação:** captura da tela inicial. Com a célula atual (8×16), o bloco
 ocupa de 122 a 238 dos 360 pixels lógicos de altura — centrado.
 
+---
+
+### 2026-09-02 — O convés vem de um arquivo
+
+**Pedido:** [issue #1](https://github.com/vdrdavi/jogo-sdl/issues/1) — carregar o
+convés de um arquivo em vez de gerar em código, para editar o interior sem
+recompilar e abrir caminho para mais de um ambiente.
+
+#### O que existia
+
+`InteriorScene::gerarConves()` montava os 20×13 tiles do convés com um laço
+duplo e algumas condições: `y == 0` é teto, `x == 0` é parede, `y == 1` é a faixa
+de janelas, e o piso ganhava grades onde `y % 5 == 0` e manchas escuras onde
+`(x*5 + y*3) % 17 < 3`. Funciona, mas o cenário só existe compilado: mover uma
+janela um tile para o lado é mexer em uma condição aritmética, recompilar e
+rodar. E o segundo ambiente seria um segundo `gerar...()`.
+
+#### O formato: texto simples, não JSON nem PNG
+
+A issue sugeria CSV, JSON ou um PNG indexado. Os três foram descartados:
+
+- **JSON** obrigaria uma biblioteca nova. O projeto tem uma regra explícita de só
+  depender do SDL3, e um mapa de tiles não é uma estrutura aninhada — é uma
+  grade.
+- **PNG indexado** deixaria o mapa editável só em um editor de imagem, invisível
+  no `git diff` e impossível de comentar. O `SDL_LoadPNG` até já está ali, mas o
+  ganho é negativo.
+- **CSV** de números resolve a grade, mas `3,3,3,5,5` não desenha nada para quem
+  lê: o formato perde a única vantagem real do texto, que é o mapa **parecer** o
+  mapa.
+
+O escolhido é um arquivo de texto com **diretivas** (linhas `chave valor`) e uma
+grade em ASCII no fim, onde cada caractere é um tile:
+
+```
+legenda . piso
+legenda # parede
+marcador console 8.5 2
+mapa
+####################
+#-ooooo------ooooo-#
+```
+
+Uma **diretiva** é um comando de uma linha para quem lê o arquivo; a **legenda**
+liga um caractere ao nome de um tile; um **marcador** é um ponto nomeado do
+cenário, em coordenadas de tile. O parser é o mesmo estilo do `.fnt` da fonte
+bitmap (`std::getline` + `std::istringstream`), então não entrou nenhuma técnica
+nova no projeto — só um arquivo a mais.
+
+#### O que ficou fora do arquivo, de propósito
+
+Quais nomes de tile existem, qual o índice de cada um no atlas
+`textures/interior.png` e quais bloqueiam o passo continuam em código, numa
+tabela única no topo de `src/world/MapaDeTiles.cpp`:
+
+```cpp
+constexpr DefinicaoDeTile kDefinicoes[] = {
+    {"piso", 0, false},  {"grade", 1, false}, {"piso-escuro", 2, false},
+    {"parede", 3, true}, {"faixa", 4, true},  {"janela", 5, true},
+};
+```
+
+A divisão é essa: o arquivo descreve **o cenário**, o código descreve **a
+textura e a colisão**. Se a solidez fosse do arquivo, um mapa mal escrito
+poderia declarar a parede atravessável — e um cenário não deveria conseguir
+mudar as regras do jogo. O preço é que um tile novo exige recompilar; ele exigiria
+de qualquer jeito, porque o recorte precisa existir no atlas.
+
+Pelo mesmo motivo o `kTile = 16` continua constante: o lado do tile é o lado do
+recorte no atlas, não uma escolha do cenário.
+
+#### O marcador do console, e por que aceita fração
+
+A posição do painel de pilotagem era `mundo.w * 0.5f - 24.0f` — centro do convés
+menos metade da largura do sprite. Se o mapa manda no cenário, o painel também é
+do mapa, então virou o marcador `console`. Só que 20 tiles de largura com um
+painel de 3 tiles dá `20/2 − 1.5 = 8,5`: o centro **não** cai em uma fronteira de
+tile. Em vez de empurrar o painel meio tile (mudaria o desenho) ou alargar o
+convés, o marcador lê `float`. Coordenada de tile fracionária é normal para
+objetos; quem é obrigado a cair na grade é só a grade.
+
+O nascimento do jogador, que também era calculado do centro do convés, passou a
+sair do console (`console_.x + console_.w * 0.5f`): ele nasce de frente para o
+painel porque é isso que se quer, e agora isso vale onde quer que o painel esteja.
+
+#### Falhar sem derrubar
+
+Um asset ausente ou torto agora é uma forma de o jogo não abrir. `MapaDeTiles`
+loga o motivo (com o caminho, e com a linha e as colunas quando é a grade que
+está errada) e monta uma **sala de emergência**: piso cercado de parede, do
+tamanho do convés original. A alternativa — mapa vazio — deixaria o jogador
+dentro do nada, e a alternativa oposta — abortar — transformaria um erro de
+digitação em um jogo que não roda.
+
+#### O tropeço: `#` é comentário e é parede
+
+O primeiro parser cortava a linha no primeiro `#`, como o leitor do `.fnt` faz.
+Só que a parede é `#` na grade — e, portanto, `legenda # parede` no cabeçalho.
+A linha virava `legenda` sem argumentos e o carregamento morria logo na primeira
+execução:
+
+```
+ERROR: .../conves.mapa: legenda invalida "legenda"
+```
+
+A correção é estreitar a regra: comentário é a **linha inteira** que começa com
+`#`, nunca um rabicho no fim. Dentro da grade nem isso — ali todo caractere é
+tile. Perde-se o comentário de fim de linha, que este formato não precisa.
+
+#### Verificação
+
+O convés novo tinha que ser o convés velho, pixel por pixel — o objetivo era
+mudar de onde o mapa vem, não como ele é. As 13 linhas da grade foram geradas
+rodando o algoritmo antigo, e a conferência foi uma captura dos dois:
+
+- `git worktree` em `HEAD`, com o mesmo patch `// TEMP` de captura
+  (`SDL_RenderReadPixels` + `SDL_SavePNG` no quadro 90, `SDL_VIDEODRIVER=dummy`,
+  `main.cpp` apontado para a `InteriorScene`);
+- as duas imagens de 1280×720 comparadas com `ImageChops.difference`.
+
+`getbbox()` da diferença deu `None`: **zero pixels diferentes** entre o convés
+gerado em código e o convés lido do arquivo — grade, painel e posição inicial do
+jogador incluídos.
+
+Os caminhos de erro foram exercitados um a um, editando a cópia dos assets em
+`build/debug/assets/`, e todos os cinco logaram e seguiram rodando:
+
+| O que foi quebrado | O que saiu no log |
+|---|---|
+| arquivo removido | `Nao foi possivel abrir .../conves.mapa` |
+| linha da grade com 19 colunas | `linha 3 da grade tem 19 colunas, esperava 20` |
+| `X` na grade | `caractere 'X' fora da legenda` |
+| diretiva `tamanho 3` | `diretiva desconhecida "tamanho"` |
+| `marcador console` removido | (sem log: o centro do convés é o palpite) |
+
+Build limpo do zero nos dois presets, sem nenhum warning, e o teste de fumaça
+sem sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
+
 ## Glossário
 
 | Termo | O que é |
@@ -538,6 +676,7 @@ ocupa de 122 a 238 dos 360 pixels lógicos de altura — centrado.
 | **dB por oitava** | Quanto a amplitude cai cada vez que a frequência dobra. |
 | **Delta time** | Tempo real decorrido entre dois quadros. |
 | **Determinístico** | Mesma entrada, mesmo resultado, sempre. |
+| **Diretiva** | Linha `chave valor` de um arquivo de dados, lida como um comando por quem carrega. |
 | **Driver dummy / disk** | Backends do SDL que fingem vídeo/áudio ou gravam o áudio em arquivo. |
 | **Envelope** | Curva que multiplica a amplitude de um som ao longo do tempo (ataque, decaimento). |
 | **Esfera de colisão** | Esfera que substitui a geometria real nos testes de colisão. |
@@ -548,9 +687,11 @@ ocupa de 122 a 238 dos 360 pixels lógicos de altura — centrado.
 | **Ganho** | Multiplicador de amplitude de um som. |
 | **Icosaedro** | Poliedro de 20 faces triangulares e 12 vértices. |
 | **Integrador com vazamento** | Soma acumulada que esquece o passado aos poucos, e por isso não passeia sem limite. |
+| **Legenda (de mapa)** | A tabela que liga cada caractere da grade a um tile. |
 | **Letterbox** | Barras pretas quando a proporção da janela não bate com a do jogo. |
 | **Livre caminho médio** | Distância média percorrida entre duas colisões: `1/(densidade × seção de choque)`. |
 | **Malha (mesh)** | Lista de vértices mais a lista de triângulos que os indexam. |
+| **Marcador** | Ponto nomeado do cenário (ex.: onde fica o console), em coordenadas de tile. |
 | **Mixar** | Somar várias fontes de áudio em uma saída. |
 | **Névoa (fog)** | Misturar a cor das faces com a cor do fundo conforme a distância. |
 | **Normal** | Vetor perpendicular a uma face; diz para que lado ela aponta. |

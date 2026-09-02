@@ -1,6 +1,5 @@
 #include "scenes/InteriorScene.hpp"
 
-#include <algorithm>
 #include <cmath>
 
 #include "core/App.hpp"
@@ -33,49 +32,7 @@ InteriorScene::InteriorScene()
     : camera_(static_cast<float>(App::kLarguraLogica), static_cast<float>(App::kAlturaLogica)) {}
 
 SDL_FRect InteriorScene::limitesDoMundo() const {
-    return SDL_FRect{0.0f, 0.0f, static_cast<float>(kLarguraMapa * kTile),
-                     static_cast<float>(kAlturaMapa * kTile)};
-}
-
-void InteriorScene::gerarConves() {
-    mapa_.assign(static_cast<std::size_t>(kLarguraMapa * kAlturaMapa), kPiso);
-
-    for (int y = 0; y < kAlturaMapa; ++y) {
-        for (int x = 0; x < kLarguraMapa; ++x) {
-            Uint8 tile = kPiso;
-
-            const bool bordaLateral = x == 0 || x == kLarguraMapa - 1;
-            const bool bordaBaixo = y >= kAlturaMapa - 1;
-            const bool tetoCasco = y == 0;
-            const bool paredeSuperior = y == 1;
-
-            if (tetoCasco || bordaLateral || bordaBaixo) {
-                tile = kParede;
-            } else if (paredeSuperior) {
-                // Faixa de janelas para o espaco, com painel luminoso no meio.
-                const bool janela = (x >= 2 && x <= 6) || (x >= kLarguraMapa - 7 && x <= kLarguraMapa - 3);
-                tile = janela ? kJanela : kFaixa;
-            } else {
-                // Piso: grades de ventilacao em faixas, variacao deterministica.
-                const int padrao = (x * 5 + y * 3) % 17;
-                if (y % 5 == 0 && x % 3 != 0) {
-                    tile = kGrade;
-                } else if (padrao < 3) {
-                    tile = kPisoEscuro;
-                }
-            }
-
-            mapa_[static_cast<std::size_t>(y * kLarguraMapa + x)] = tile;
-        }
-    }
-}
-
-bool InteriorScene::solido(int tx, int ty) const {
-    if (tx < 0 || ty < 0 || tx >= kLarguraMapa || ty >= kAlturaMapa) {
-        return true;
-    }
-    const Uint8 tile = mapa_[static_cast<std::size_t>(ty * kLarguraMapa + tx)];
-    return tile == kParede || tile == kFaixa || tile == kJanela;
+    return mapa_.limites();
 }
 
 SDL_FRect InteriorScene::caixaDoJogador(SDL_FPoint centro) const {
@@ -100,7 +57,7 @@ void InteriorScene::moverComColisao(SDL_FPoint deslocamento) {
 
         for (int ty = y0; ty <= y1; ++ty) {
             for (int tx = x0; tx <= x1; ++tx) {
-                if (solido(tx, ty)) {
+                if (mapa_.solido(tx, ty)) {
                     return;
                 }
             }
@@ -117,7 +74,9 @@ bool InteriorScene::pertoDoConsole() const {
 }
 
 void InteriorScene::aoEntrar(Context& ctx) {
-    gerarConves();
+    // O conves vem de assets/maps/conves.mapa; se o arquivo faltar ou estiver
+    // torto, o MapaDeTiles loga e entrega uma sala fechada no lugar.
+    mapa_.carregar("maps/conves.mapa");
 
     tiles_ = ctx.assets.textura("textures/interior.png");
     jogador_.textura = ctx.assets.textura("textures/player.png");
@@ -131,14 +90,19 @@ void InteriorScene::aoEntrar(Context& ctx) {
     somConfirmar_ = ctx.audio.carregar("audio/confirm.wav");
 
     const SDL_FRect mundo = limitesDoMundo();
-    // Console encostado na parede superior, no centro do conves.
-    console_ = SDL_FRect{mundo.w * 0.5f - 24.0f, static_cast<float>(2 * kTile), 48.0f, 32.0f};
+    // Onde o painel fica e decisao do mapa: o marcador "console" da o canto
+    // superior esquerdo. Sem ele, sobra o centro do conves como palpite.
+    SDL_FPoint cantoDoConsole{mundo.w * 0.5f - consoleSprite_.tamanho.x * 0.5f,
+                              static_cast<float>(2 * kTile)};
+    mapa_.marcador("console", cantoDoConsole);
+    console_ = SDL_FRect{cantoDoConsole.x, cantoDoConsole.y, consoleSprite_.tamanho.x,
+                         consoleSprite_.tamanho.y};
     // Zona de interacao: logo a frente do painel.
     zonaDoConsole_ = SDL_FRect{console_.x - 10.0f, console_.y + console_.h, console_.w + 20.0f,
                                26.0f};
 
     // Nasce de frente para o painel: o convite [E] aparece de cara.
-    posicao_ = SDL_FPoint{mundo.w * 0.5f, console_.y + console_.h + 14.0f};
+    posicao_ = SDL_FPoint{console_.x + console_.w * 0.5f, console_.y + console_.h + 14.0f};
     posicaoAnterior_ = posicao_;
 
     camera_.definirZoom(2.0f);
@@ -202,9 +166,9 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
     // Conves
     if (tiles_ != nullptr) {
         const SDL_FRect visivel = camera.areaVisivel();
-        // O intervalo nao e mais grampeado ao mapa: fora dele o tile da borda
-        // se repete (a busca e que e grampeada), entao o casco continua em vez
-        // de abrir um vazio preto quando o tremor empurra a camera para fora.
+        // O intervalo nao e grampeado ao mapa: fora dele o tile da borda se
+        // repete (quem grampeia e MapaDeTiles::tile), entao o casco continua em
+        // vez de abrir um vazio preto quando o tremor empurra a camera para fora.
         const int x0 = static_cast<int>(std::floor(visivel.x / kTile));
         const int y0 = static_cast<int>(std::floor(visivel.y / kTile));
         const int x1 = static_cast<int>(std::ceil((visivel.x + visivel.w) / kTile));
@@ -217,9 +181,7 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
 
         for (int y = y0; y <= y1; ++y) {
             for (int x = x0; x <= x1; ++x) {
-                const int mx = std::clamp(x, 0, kLarguraMapa - 1);
-                const int my = std::clamp(y, 0, kAlturaMapa - 1);
-                const Uint8 indice = mapa_[static_cast<std::size_t>(my * kLarguraMapa + mx)];
+                const Uint8 indice = mapa_.tile(x, y);
                 tile.recorte = SDL_FRect{static_cast<float>(indice * kTile), 0.0f,
                                          static_cast<float>(kTile), static_cast<float>(kTile)};
                 draw::sprite(ctx.renderer, camera, tile,

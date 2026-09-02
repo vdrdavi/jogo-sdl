@@ -32,6 +32,7 @@ src/
 │  ├─ Starfield.*        campo de estrelas procedural com rastro
 │  └─ AsteroidField.*    campo de asteroides com wrap e colisão esfera-esfera
 ├─ sim/Flight.*          o voo da nave: pose, rochas, colisão e o ambiente
+├─ world/MapaDeTiles.*   grade de tiles lida de um arquivo em assets/maps/
 ├─ audio/Audio.*         WAVs em memória, vozes (e loops) mixados pelo dispositivo
 ├─ scene/                Scene (interface) e SceneStack (transições adiadas)
 └─ scenes/               MenuScene, InteriorScene, FlightScene, PauseScene
@@ -69,6 +70,25 @@ do quadro**, então uma cena pode trocar a si mesma com segurança durante o
 próprio `atualizar()` — é exatamente o que a `InteriorScene` faz ao apertar E.
 
 Cadastre o `.cpp` novo na lista de fontes do `CMakeLists.txt`.
+
+## Como editar o cenário
+
+O convés da `InteriorScene` é lido de `assets/maps/conves.mapa` por
+[`world/MapaDeTiles`](../src/world/MapaDeTiles.hpp). O arquivo traz três
+diretivas — `legenda <caractere> <nome-do-tile>`, `marcador <nome> <x> <y>` (em
+tiles, aceita fração) e `mapa`, que abre a grade — e o próprio arquivo explica o
+formato no cabeçalho. Um novo ambiente é um arquivo novo mais um
+`carregar("maps/<nome>.mapa")`.
+
+O que **não** está no arquivo: os nomes de tile válidos, o índice de cada um no
+atlas e quais são sólidos. Isso vive na tabela `kDefinicoes` no topo de
+[`MapaDeTiles.cpp`](../src/world/MapaDeTiles.cpp), porque descreve a textura e a
+colisão, não o cenário. Acrescentar um tile é acrescentar um recorte ao atlas e
+uma linha nessa tabela.
+
+Qualquer falha de leitura (arquivo ausente, linha da grade com comprimento
+diferente, caractere fora da legenda) é logada e substituída por uma sala
+fechada de emergência: um cenário quebrado degrada o jogo, não o derruba.
 
 ## Como adicionar assets
 

@@ -77,6 +77,28 @@ O voo não é a tela do voo: ele é estado da viagem (`sim/Flight.*`) e continua
 acontecendo enquanto o jogador anda pelo convés — a nave segue reto no piloto
 automático e pode bater, e aí o convés inteiro sacode.
 
+## O convés vem de um arquivo
+
+O interior da nave não é gerado em código: `assets/maps/conves.mapa` é um arquivo
+de texto com a legenda de caracteres, marcadores nomeados e a grade desenhada
+caractere a caractere. Editar o cenário — mover o painel de pilotagem, abrir uma
+janela, mudar o tamanho do convés — é editar esse arquivo e rodar de novo, sem
+recompilar.
+
+```
+legenda . piso
+legenda # parede
+marcador console 8.5 2
+mapa
+####################
+#-ooooo------ooooo-#
+#.....,..,......,..#
+```
+
+Quais nomes de tile existem, o índice de cada um no atlas e quais bloqueiam o
+passo continuam no código (`src/world/MapaDeTiles.cpp`): isso é propriedade da
+textura e da colisão, não do desenho do cenário.
+
 ## Som
 
 Sem `SDL3_mixer`: cada reprodução é um `SDL_AudioStream` ligado ao dispositivo,
