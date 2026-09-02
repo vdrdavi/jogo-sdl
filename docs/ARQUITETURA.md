@@ -1,7 +1,9 @@
 # Arquitetura
 
 Documento para quem vai mexer no código. Para o que o jogo é, como compilar e
-como o laço e o 3D funcionam, veja o [README](../README.md).
+como o laço e o 3D funcionam, veja o [README](../README.md); para *como cada
+coisa foi feita e por quê*, com os termos explicados, veja o
+[diário de desenvolvimento](DESENVOLVIMENTO.md).
 
 ## Mapa do código
 

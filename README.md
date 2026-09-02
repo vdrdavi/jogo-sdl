@@ -106,6 +106,9 @@ real da janela e converte as coordenadas do mouse.
 Mapa do código, como adicionar uma cena e como adicionar assets:
 [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
+Como cada coisa foi feita e por quê, com os termos técnicos explicados e o
+diário de cada implementação: [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md).
+
 ## Licença
 
 Código sob a licença MIT — veja [LICENSE](LICENSE).

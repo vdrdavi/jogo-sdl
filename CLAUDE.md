@@ -5,6 +5,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Jogo 2D/3D em C++20 sobre SDL3: o jogador anda pelo interior de uma nave em 2D e,
 no painel de pilotagem, passa para uma visão 3D de voo por estrelas procedurais.
 
+## Diário de desenvolvimento
+
+**Toda implementação nova entra em
+[docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md), no mesmo commit da
+implementação.** Não é um changelog: é o documento que explica o *processo* —
+as decisões e o porquê delas, as alternativas descartadas, o que quebrou no
+caminho e como a mudança foi conferida — e que explica **cada termo técnico**
+que usa, porque o leitor não é necessariamente da área.
+
+Uma entrada nova vai no fim da Parte 3 e traz:
+
+- o pedido, em uma linha;
+- as decisões e o **porquê**, incluindo o que foi descartado e por quê;
+- os termos técnicos novos, explicados no texto e acrescentados ao glossário;
+- os tropeços: o que quebrou, por que quebrou e como foi corrigido;
+- **como a mudança foi verificada**, com os números que foram medidos.
+
+As entradas se identificam por data e título; o hash do commit é opcional e só
+aparece quando já existe (ao documentar algo commitado antes). Se a mudança
+introduzir um jeito novo de conferir alguma coisa, a Parte 2 também cresce.
+
 ## Comandos
 
 ```sh
@@ -35,6 +56,19 @@ laço de `App::rodar()` que grava o viewport com `SDL_RenderReadPixels` +
 janela do jogo perde o foco e as teclas vão parar em outra aplicação do usuário.
 Para exercitar uma cena específica, aponte `main.cpp` para ela num build
 temporário e reverta depois.
+
+Para o áudio existe o equivalente: o driver `disk` do SDL grava o PCM cru em vez
+de tocar, e aí o som vira número.
+
+```sh
+SDL_AUDIO_DRIVER=disk SDL_AUDIO_DISK_OUTPUT_FILE=saida.raw ./build/debug/jogo
+```
+
+O arquivo sai no formato do dispositivo (aqui S16LE estéreo a 44100 Hz); foi
+assim que o loop do ambiente, os fades e o abafamento do casco foram conferidos.
+
+Marque todo patch temporário com `// TEMP` e confira com `grep -rn "TEMP" src/`
+antes de commitar.
 
 ## Arquitetura
 
@@ -134,4 +168,5 @@ Identificadores e comentários em português; arquivos de `src/` sem acentuaçã
 `README.md` e `docs/` com acentuação normal. Mensagens de commit em português,
 com o corpo explicando **por que** a mudança foi feita.
 
-Mais detalhes em [README.md](README.md) e [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+Mais detalhes em [README.md](README.md), [docs/ARQUITETURA.md](docs/ARQUITETURA.md)
+e [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md).
