@@ -5,26 +5,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Jogo 2D/3D em C++20 sobre SDL3: o jogador anda pelo interior de uma nave em 2D e,
 no painel de pilotagem, passa para uma visão 3D de voo por estrelas procedurais.
 
-## Diário de desenvolvimento
+## O guia do programa
 
-**Toda implementação nova entra em
-[docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md), no mesmo commit da
-implementação.** Não é um changelog: é o documento que explica o *processo* —
-as decisões e o porquê delas, as alternativas descartadas, o que quebrou no
-caminho e como a mudança foi conferida — e que explica **cada termo técnico**
-que usa, porque o leitor não é necessariamente da área.
+**[docs/FUNCIONAMENTO.md](docs/FUNCIONAMENTO.md) explica como cada peça do
+programa funciona**, para quem não é necessariamente da área: o laço, as
+coordenadas, a pilha de cenas, a entrada, o 2D, o mapa de tiles, o 3D, o voo, as
+cenas, o áudio, os assets e o build. Todo termo técnico é explicado onde aparece
+e repetido no glossário.
 
-Uma entrada nova vai no fim da Parte 3 e traz:
+Não é um diário nem um changelog: **descreve o programa como ele é hoje**.
+Quando uma mudança altera um mecanismo descrito lá — o laço, a pilha, o pipeline
+3D, o formato do mapa, o jeito de tocar som —, a seção correspondente é
+reescrita **no mesmo commit** da implementação, e não acrescentada como nota de
+"antes era assim". Mecanismo novo ganha seção nova; termo técnico novo entra no
+texto e no glossário.
 
-- o pedido, em uma linha;
-- as decisões e o **porquê**, incluindo o que foi descartado e por quê;
-- os termos técnicos novos, explicados no texto e acrescentados ao glossário;
-- os tropeços: o que quebrou, por que quebrou e como foi corrigido;
-- **como a mudança foi verificada**, com os números que foram medidos.
-
-As entradas se identificam por data e título; o hash do commit é opcional e só
-aparece quando já existe (ao documentar algo commitado antes). Se a mudança
-introduzir um jeito novo de conferir alguma coisa, a Parte 2 também cresce.
+O registro do que mudou e quando é o histórico do git; o **porquê** de cada
+mudança vai no corpo da mensagem de commit.
 
 ## Comandos
 
@@ -179,4 +176,4 @@ Identificadores e comentários em português; arquivos de `src/` sem acentuaçã
 com o corpo explicando **por que** a mudança foi feita.
 
 Mais detalhes em [README.md](README.md), [docs/ARQUITETURA.md](docs/ARQUITETURA.md)
-e [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md).
+e [docs/FUNCIONAMENTO.md](docs/FUNCIONAMENTO.md).
