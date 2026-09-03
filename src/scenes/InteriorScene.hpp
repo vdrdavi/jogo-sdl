@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "audio/Audio.hpp"
+#include "gfx/Animacao.hpp"
 #include "gfx/Camera.hpp"
 #include "gfx/Sprite.hpp"
 #include "scene/Scene.hpp"
@@ -37,6 +38,13 @@ private:
     /// Para onde o zoom vai enquanto a cortina fecha sobre o painel.
     static constexpr float kZoomConsole = 3.1f;
 
+    /// Clipes da folha textures/player.png: uma linha por estado, quatro
+    /// quadros por linha. O ritmo do andar sai da velocidade -- a 96 u/s um
+    /// ciclo de 8 quadros por segundo cobre 48 unidades, uma passada e meia do
+    /// personagem, que e o que faz o pe parecer preso no chao.
+    static constexpr Clipe kParado{0, 4, 2.5f};
+    static constexpr Clipe kAndando{1, 4, 8.0f};
+
     /// Move o jogador resolvendo colisao contra os tiles, um eixo por vez.
     void moverComColisao(SDL_FPoint deslocamento);
     SDL_FRect caixaDoJogador(SDL_FPoint centro) const;
@@ -44,6 +52,8 @@ private:
     bool pertoDoConsole() const;
     /// Inclina a camera sobre o painel na mesma medida em que a cortina fecha.
     void aproximarDoConsole(float dt);
+    /// Escolhe o clipe pelo que o jogador esta fazendo e anda o temporizador.
+    void animarJogador(SDL_FPoint direcao, float dt);
 
     MapaDeTiles mapa_;
     Camera camera_;
@@ -59,6 +69,7 @@ private:
     SDL_FRect zonaDoConsole_{0.0f, 0.0f, 0.0f, 0.0f};
 
     Sprite jogador_;
+    Animacao animacaoJogador_;
     Sprite consoleSprite_;
     SDL_Texture* tiles_{nullptr};
     Audio::SomId somConfirmar_{0};

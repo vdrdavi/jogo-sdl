@@ -22,6 +22,7 @@ src/
 ├─ gfx/
 │  ├─ Assets.*           cache de texturas (PNG/BMP)
 │  ├─ Sprite.hpp         recorte de atlas, âncora, rotação, espelho, tinta
+│  ├─ Animacao.*         temporizador de quadros sobre um atlas em grade
 │  ├─ Camera.*           mundo↔tela, zoom, seguir alvo, limites do mundo
 │  ├─ Draw.*             desenho de sprites/retângulos/linhas em mundo ou tela
 │  └─ BitmapFont.*       texto UTF-8 a partir de um atlas + .fnt

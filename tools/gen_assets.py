@@ -87,24 +87,67 @@ def gerar_fonte(tamanho_px: int = 16, colunas: int = 16) -> None:
           f"(celula {largura_celula}x{altura_celula}, {len(CHARSET)} glifos)")
 
 
-def gerar_jogador(lado: int = 32) -> None:
-    img = Image.new("RGBA", (lado, lado), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
+def desenhar_jogador(d, x0: int, lado: int, corpo_dy: int,
+                     perna_esq_dy: int, perna_dir_dy: int) -> None:
+    """Desenha um quadro do personagem na celula que comeca em x0.
+
+    As pernas vao antes do corpo para a junta ficar escondida atras dele; o
+    `corpo_dy` desce o tronco (e o visor e a antena junto), que e o que da o
+    balanco tanto da respiracao quanto do passo.
+    """
+    contorno = (24, 44, 66, 255)
+    # pernas: dy negativo levanta o pe (topo e base sobem juntos)
+    for (px, dy) in ((x0 + 10, perna_esq_dy), (x0 + 17, perna_dir_dy)):
+        d.rectangle([px, 20 + dy, px + 4, 29 + dy], fill=(52, 104, 148, 255), outline=contorno)
     # corpo
-    d.rounded_rectangle([4, 6, lado - 5, lado - 3], radius=5,
-                        fill=(86, 168, 220, 255), outline=(24, 44, 66, 255), width=2)
+    d.rounded_rectangle([x0 + 4, 6 + corpo_dy, x0 + lado - 5, 21 + corpo_dy], radius=5,
+                        fill=(86, 168, 220, 255), outline=contorno, width=2)
     # visor
-    d.rectangle([9, 12, lado - 10, 19], fill=(226, 244, 255, 255), outline=(24, 44, 66, 255))
+    d.rectangle([x0 + 9, 11 + corpo_dy, x0 + lado - 10, 17 + corpo_dy],
+                fill=(226, 244, 255, 255), outline=contorno)
     # pupilas
-    d.rectangle([11, 14, 13, 17], fill=(24, 44, 66, 255))
-    d.rectangle([lado - 14, 14, lado - 12, 17], fill=(24, 44, 66, 255))
+    d.rectangle([x0 + 11, 13 + corpo_dy, x0 + 13, 16 + corpo_dy], fill=contorno)
+    d.rectangle([x0 + lado - 14, 13 + corpo_dy, x0 + lado - 12, 16 + corpo_dy], fill=contorno)
     # antena
-    d.line([lado // 2, 6, lado // 2, 1], fill=(24, 44, 66, 255), width=2)
-    d.ellipse([lado // 2 - 3, 0, lado // 2 + 1, 4], fill=(240, 196, 84, 255),
-              outline=(24, 44, 66, 255))
+    meio = x0 + lado // 2
+    d.line([meio, 6 + corpo_dy, meio, 1 + corpo_dy], fill=contorno, width=2)
+    d.ellipse([meio - 3, 0 + corpo_dy, meio + 1, 4 + corpo_dy], fill=(240, 196, 84, 255),
+              outline=contorno)
+
+
+def gerar_jogador(lado: int = 32, colunas: int = 4) -> None:
+    """Folha de sprites do jogador: linha 0 parado, linha 1 andando.
+
+    A grade e regular de proposito -- toda celula tem `lado` x `lado` --, porque
+    e assim que jogo::Animacao recorta: a linha escolhe o clipe e a coluna
+    escolhe o quadro, sem tabela de recortes por quadro.
+
+    Cada quadro e (deslocamento do corpo, do pe esquerdo, do pe direito). Parado
+    e so o tronco subindo e descendo um pixel; andando levanta um pe de cada vez
+    e abaixa o corpo no meio do passo, quando o peso cai sobre a perna.
+    """
+    linhas = [
+        [(0, 0, 0), (0, 0, 0), (1, 0, 0), (1, 0, 0)],       # parado (respiracao)
+        [(0, -4, 0), (1, 0, 0), (0, 0, -4), (1, 0, 0)],     # andando
+    ]
+
+    img = Image.new("RGBA", (lado * colunas, lado * len(linhas)), (0, 0, 0, 0))
+    for indice, quadros in enumerate(linhas):
+        if len(quadros) != colunas:
+            raise SystemExit("toda linha da folha precisa ter o mesmo numero de quadros")
+        # Cada linha e desenhada em uma imagem de uma celula de altura e colada
+        # na folha: assim os deslocamentos verticais dos quadros sao relativos a
+        # celula, sem um offset de linha espalhado por cada primitiva.
+        faixa = Image.new("RGBA", (lado * colunas, lado), (0, 0, 0, 0))
+        d = ImageDraw.Draw(faixa)
+        for coluna, (corpo, pe_esq, pe_dir) in enumerate(quadros):
+            desenhar_jogador(d, coluna * lado, lado, corpo, pe_esq, pe_dir)
+        img.paste(faixa, (0, indice * lado))
+
     destino = ASSETS / "textures" / "player.png"
     img.save(destino)
-    print(f"{destino.name}: {img.width}x{img.height}")
+    print(f"{destino.name}: {img.width}x{img.height} "
+          f"({len(linhas)} clipes de {colunas} quadros de {lado}px)")
 
 
 def gerar_tiles(lado: int = 16) -> None:

@@ -24,6 +24,7 @@ add_executable(jogo
     src/core/App.cpp
     src/core/Paths.cpp
     src/input/Input.cpp
+    src/gfx/Animacao.cpp
     src/gfx/Assets.cpp
     src/gfx/Camera.cpp
     src/gfx/Draw.cpp

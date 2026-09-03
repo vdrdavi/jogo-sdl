@@ -826,6 +826,117 @@ Build limpo do zero nos dois presets, sem nenhum warning, e o teste de fumaça s
 sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 
 
+### 2026-09-02 — O personagem ganha passos (issue #4)
+
+**O pedido:** o `Sprite` desenha um recorte de atlas, mas o recorte é fixo; um
+componente simples de animação — linha do atlas, número de quadros e um
+temporizador — daria passos ao personagem dentro da nave.
+
+#### O que havia
+
+`assets/textures/player.png` era **uma** imagem de 32×32 e a `InteriorScene`
+desenhava sempre ela. O único movimento do personagem era um truque no desenho:
+
+```cpp
+draw::sprite(ctx.renderer, camera, jogador,
+             SDL_FPoint{desenhada.x, desenhada.y + std::sin(tempo_ * 5.0f) * 0.8f});
+```
+
+Um seno somado à posição de desenho — a figura inteira flutuava 0,8 unidade,
+pés e antena juntos. Com a câmera em zoom 2× isso dá menos de dois pixels de
+tela, e o que se via não era alguém respirando: era a imagem toda tremendo, sem
+ponto de apoio. Andando, então, o personagem **deslizava**: mudava de lugar sem
+mudar de forma.
+
+#### O componente: quem anima não é quem desenha
+
+[`gfx/Animacao.*`](../src/gfx/Animacao.hpp) é um temporizador sobre um atlas em
+**grade regular**: a linha escolhe o clipe, a coluna escolhe o quadro.
+
+```cpp
+struct Clipe {      // só descrição: qual linha, quantos quadros, a que ritmo
+    int linha{0};
+    int quadros{1};
+    float fps{8.0f};
+};
+```
+
+O estado (que quadro está no ar) fica na `Animacao`, não no `Clipe` — assim o
+mesmo clipe pode ser tocado por vários personagens, cada um no seu tempo. E a
+`Animacao` não desenha nada: ela devolve um `SDL_FRect`, que é exatamente o
+`Sprite::recorte` que o `Draw` já sabia usar desde o primeiro dia. **O `Sprite`
+continua sem saber o que é uma animação.**
+
+A grade regular é a decisão que faz o componente caber em cinquenta linhas. A
+alternativa seria uma lista de recortes por quadro (o que um empacotador de
+atlas produz, com cada quadro num canto diferente da textura). Ela é mais geral
+e paga por isso: um arquivo de metadados por folha, para um projeto em que as
+folhas saem de um script Python de trinta linhas. Enquanto `gen_assets.py` puder
+desenhar a folha em grade, `linha × coluna` é o suficiente.
+
+Duas escolhas menores, ambas por causa de um erro que dá para prever:
+
+- **`tocar()` só reinicia se a linha for outra.** As cenas chamam `tocar()` a
+  cada passo com o clipe do estado atual — é o jeito natural de escrever isso —,
+  e reiniciar sempre travaria o personagem no quadro 0 enquanto ele anda.
+  A linha do atlas é a identidade do clipe.
+- **O acumulador desconta a duração em vez de zerar.** Com `tempo_ = 0` a cada
+  troca de quadro, um clipe mais rápido que o passo fixo (fps > 60) andaria no
+  ritmo do passo, e a cadência dependeria do `dt`. Descontando, o resto conta
+  para o quadro seguinte.
+
+E `atualizar()` é chamado do `atualizar` da cena, nunca do `desenhar`: com o
+passo fixo do `App`, a animação fica igual em qualquer taxa de quadros — a mesma
+razão pela qual a simulação já vivia lá.
+
+#### A folha de sprites
+
+`gerar_jogador` em `tools/gen_assets.py` passou a desenhar 4×2 células de 32 px
+(128×64): linha 0 parado, linha 1 andando. Cada quadro é uma tripla de
+deslocamentos — corpo, pé esquerdo, pé direito:
+
+| Linha | Quadros | O que muda |
+|---|---|---|
+| 0 — parado | `(0,0,0) (0,0,0) (1,0,0) (1,0,0)` | o tronco desce um pixel e volta |
+| 1 — andando | `(0,-4,0) (1,0,0) (0,0,-4) (1,0,0)` | um pé sobe de cada vez; no meio do passo o corpo abaixa |
+
+O personagem ganhou pernas para o ciclo poder ser lido: o corpo, que ia até o
+pixel 29 da célula, foi encurtado para 21, e duas pernas de 5×10 saem debaixo
+dele. As pernas são desenhadas **antes** do corpo, para a junta ficar escondida
+atrás dele, e o pé levantado sobe topo e base juntos (senão a perna estica em
+vez de levantar — foi assim que saiu na primeira tentativa, com o pé
+desaparecendo atrás do corpo).
+
+O balanço do parado agora é o clipe 0, e o seno saiu do desenho. A diferença é
+que o tronco desce **e as pernas ficam onde estão**: há um ponto de apoio.
+
+#### Verificação
+
+A cadência foi medida por um log `// TEMP` dentro do `animarJogador`, contando
+quantos passos fixos cada quadro dura (a taxa de quadros do teste é irrelevante,
+e é esse o ponto):
+
+| Clipe | Passos por quadro | Esperado |
+|---|---|---|
+| andando (8 fps) | 7, 7, 8, 7, 8, 7, 8, 7 … | 60/8 = **7,5** |
+| parado (2,5 fps) | 23, 24, 24, 24, 24 … | 60/2,5 = **24** |
+
+O 7/8 alternado é o acumulador funcionando: nenhum dos dois valores é 7,5, mas a
+média é — e não há deriva ao longo do tempo. A 96 u/s, um ciclo de quatro
+quadros (30 passos, 0,5 s) cobre 48 unidades de mundo, uma passada e meia do
+personagem: é essa relação que faz o pé parecer preso ao chão em vez de patinar.
+
+Visualmente, com o `SDL_RenderReadPixels` + `SDL_SavePNG` de sempre e o
+`main.cpp` apontado para a `InteriorScene`, dezesseis quadros seguidos com o
+personagem andando para a direita: contando os pixels da cor da perna
+(52,104,148) em cada captura, o total alterna entre **576** (dois pés no chão) e
+**480** (um pé levantado, escondido atrás do corpo), e o topo do corpo oscila
+entre y=255 e y=251 — o agachamento de um pixel lógico (dois de tela, no zoom
+2×).
+
+Build limpo do zero nos dois presets, sem nenhum warning, e o teste de fumaça sem
+sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
+
 ## Glossário
 
 | Termo | O que é |
@@ -838,6 +949,8 @@ sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 | **Back-face culling** | Descartar as faces que apontam para o lado oposto ao da câmera. |
 | **Borda (entrada)** | O instante em que uma tecla passa de solta a pressionada (ou o contrário). |
 | **Crossfade** | Misturar o fim de um trecho com o começo do outro. Altera o espectro. |
+| **Ciclo de caminhada** | Sequência curta de quadros que se repete enquanto o personagem anda. |
+| **Clipe (animação)** | Uma linha da folha de sprites tocada como sequência: quantos quadros e a que ritmo. |
 | **Cortina (transição)** | Retângulo de cor que cobre a tela para emendar duas cenas sem corte. |
 | **dB por oitava** | Quanto a amplitude cai cada vez que a frequência dobra. |
 | **Delta time** | Tempo real decorrido entre dois quadros. |
@@ -850,6 +963,7 @@ sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 | **Filtro IIR de um polo** | Filtro cuja saída depende da saída anterior; aqui, um passa-baixa de -6 dB/oitava. |
 | **FOV** | Abertura angular da câmera. Maior FOV = mais "grande angular". |
 | **Fonte bitmap** | Fonte já rasterizada como atlas de glifos, em vez de curvas (TrueType). |
+| **Folha de sprites** | Atlas em que cada célula é um quadro de animação; aqui, uma linha por clipe. |
 | **Ganho** | Multiplicador de amplitude de um som. |
 | **Icosaedro** | Poliedro de 20 faces triangulares e 12 vértices. |
 | **Integrador com vazamento** | Soma acumulada que esquece o passado aos poucos, e por isso não passeia sem limite. |

@@ -16,6 +16,7 @@ namespace {
 constexpr SDL_Color kCorHud{226, 232, 240, 255};
 constexpr SDL_Color kCorPainel{12, 14, 22, 170};
 constexpr SDL_FPoint kTamanhoJogador{20.0f, 12.0f};  // caixa de colisao (pes)
+constexpr float kCelulaJogador = 32.0f;  // celula da folha textures/player.png
 
 SDL_FPoint interpolar(SDL_FPoint anterior, SDL_FPoint atual, float alpha) {
     return SDL_FPoint{anterior.x + (atual.x - anterior.x) * alpha,
@@ -80,8 +81,10 @@ void InteriorScene::aoEntrar(Context& ctx) {
 
     tiles_ = ctx.assets.textura("textures/interior.png");
     jogador_.textura = ctx.assets.textura("textures/player.png");
-    jogador_.tamanho = SDL_FPoint{32.0f, 32.0f};
+    jogador_.tamanho = SDL_FPoint{kCelulaJogador, kCelulaJogador};
     jogador_.ancora = SDL_FPoint{0.5f, 0.72f};  // ancora nos pes
+    animacaoJogador_.definirCelula(kCelulaJogador, kCelulaJogador);
+    animacaoJogador_.tocar(kParado);
 
     consoleSprite_.textura = ctx.assets.textura("textures/console.png");
     consoleSprite_.tamanho = SDL_FPoint{48.0f, 32.0f};
@@ -138,6 +141,12 @@ void InteriorScene::aproximarDoConsole(float dt) {
     camera_.limitarA(limitesDoMundo());
 }
 
+void InteriorScene::animarJogador(SDL_FPoint direcao, float dt) {
+    const bool andando = direcao.x != 0.0f || direcao.y != 0.0f;
+    animacaoJogador_.tocar(andando ? kAndando : kParado);
+    animacaoJogador_.atualizar(dt);
+}
+
 void InteriorScene::atualizar(Context& ctx, float dt) {
     tempo_ += dt;
     posicaoAnterior_ = posicao_;
@@ -155,6 +164,9 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
             ctx.cenas.empilhar(std::make_unique<FlightScene>(voo_));
         }
         aproximarDoConsole(dt);
+        // Sem tecla lida, o jogador esta parado de fato: o clipe segue o estado
+        // e nao a tecla, senao ele congelaria no meio de um passo.
+        animarJogador(SDL_FPoint{0.0f, 0.0f}, dt);
         return;
     }
 
@@ -175,6 +187,7 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
 
     const SDL_FPoint direcao = ctx.input.eixoMovimento();
     moverComColisao(SDL_FPoint{direcao.x * kVelocidade * dt, direcao.y * kVelocidade * dt});
+    animarJogador(direcao, dt);
 
     if (direcao.x < 0.0f) {
         espelho_ = SDL_FLIP_HORIZONTAL;
@@ -238,10 +251,13 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
     draw::retanguloMundo(ctx.renderer, camera,
                          SDL_FRect{desenhada.x - 9.0f, desenhada.y - 2.0f, 18.0f, 5.0f},
                          SDL_Color{0, 0, 0, 80});
+    // O balanco de quem esta parado vinha daqui, de um seno somado a posicao de
+    // desenho; agora ele e o clipe "parado" da folha -- em vez de a imagem
+    // inteira flutuar meio pixel, o tronco desce um pixel e as pernas ficam.
     Sprite jogador = jogador_;
     jogador.espelho = espelho_;
-    draw::sprite(ctx.renderer, camera, jogador,
-                 SDL_FPoint{desenhada.x, desenhada.y + std::sin(tempo_ * 5.0f) * 0.8f});
+    jogador.recorte = animacaoJogador_.recorte();
+    draw::sprite(ctx.renderer, camera, jogador, desenhada);
 
     // Convite de interacao, ancorado no console e em coordenadas de tela.
     if (pertoDoConsole()) {
