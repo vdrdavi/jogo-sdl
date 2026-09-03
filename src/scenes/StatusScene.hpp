@@ -37,6 +37,10 @@ private:
     /// A nave diagnosticada; vive na cena de baixo.
     Flight& voo_;
 
+    /// Mesma trava da InteriorScene: dois passos no mesmo quadro nao podem
+    /// pedir duas vezes a vista externa.
+    bool entregouADestruicao_{false};
+
     /// O que o mostrador exibe, perseguindo voo_.casco(). A diferenca entre os
     /// dois e o pedaco que acabou de ser arrancado, e e desenhada em vermelho.
     float ponteiro_{1.0f};

@@ -354,9 +354,13 @@ def gerar_ambiente(nome: str, duracao: float = 4.0, taxa: int = 22050,
 
 
 def gerar_impacto(nome: str, duracao: float = 0.5, taxa: int = 22050,
-                  corte: float = 110.0, semente: int = 0x1A9A) -> None:
+                  corte: float = 110.0, semente: int = 0x1A9A,
+                  decaimento: float = 9.0) -> None:
     """Baque: o mesmo ruido marrom, so que com decaimento rapido. Corte mais
-    alto que o do ambiente para o estouro ter corpo em vez de so rugir."""
+    alto que o do ambiente para o estouro ter corpo em vez de so rugir.
+
+    O decaimento e o que separa um esbarrao no casco (rapido, seco) do estouro
+    que acaba com a nave (grave, com cauda longa)."""
     total = int(taxa * duracao)
     marrom = ruido_marrom(total, taxa, corte, semente)
 
@@ -365,7 +369,7 @@ def gerar_impacto(nome: str, duracao: float = 0.5, taxa: int = 22050,
     for i, v in enumerate(marrom):
         t = i / taxa
         ataque = min(1.0, t / 0.003)
-        amostras.append(v / pico * 0.9 * ataque * math.exp(-t * 9.0))
+        amostras.append(v / pico * 0.9 * ataque * math.exp(-t * decaimento))
     escrever_wav(nome, amostras, taxa)
     print(f"{nome}: {duracao * 1000:.0f} ms (baque de ruido marrom)")
 
@@ -383,6 +387,10 @@ def main() -> None:
     gerar_wav("back.wav", 330.0, 0.12)
     gerar_ambiente("espaco.wav")
     gerar_impacto("impacto.wav")
+    # O fim da nave: o mesmo baque, mais grave e com uma cauda que dura o
+    # tempo de ver os destrocos se afastarem.
+    gerar_impacto("destruicao.wav", duracao=2.2, corte=52.0, semente=0xDEAD,
+                  decaimento=2.0)
 
 
 if __name__ == "__main__":

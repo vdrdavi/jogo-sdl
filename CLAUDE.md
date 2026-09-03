@@ -93,6 +93,15 @@ nisso, confira que continua assim. A `FlightScene` guarda uma referência para o
 cena de baixo; isso é seguro porque a pilha só desempilha do topo, então o
 interior sempre sobrevive à cabine.
 
+**O fim da nave.** Cada batida tira 0,125 do casco; `Flight::destruida()` é
+`casco() <= 0`, e não um segundo estado a manter em dia. A partir daí o `Flight`
+não manobra, não acelera, não colide e cala o ambiente — só carrega para a
+frente o que sobrou. Quem estiver no topo entrega a vez à `FlightScene` (a
+`InteriorScene` empilhando, a `StatusScene` substituindo-se), que estilhaça a
+malha em `Destrocos`, mostra os cacos de fora e termina em `GameOverScene`. Os
+três caminhos convergem para `MenuScene ▸ InteriorScene ▸ FlightScene`, e é isso
+que deixa o "voltar ao menu" do fim de jogo ser sempre dois `desempilhar`.
+
 **Pilha de cenas.** `empilhar`/`desempilhar`/`substituir` são adiados para o fim
 do quadro, então uma cena pode trocar a si mesma durante o próprio `atualizar()`.
 `bloqueiaUpdate()` e `bloqueiaRender()` decidem se as cenas abaixo continuam

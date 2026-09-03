@@ -60,6 +60,11 @@ private:
     Flight voo_;
     Transicao transicao_;
 
+    /// A vista externa ja foi pedida para mostrar o fim da nave. Sem esta
+    /// trava, dois passos fixos no mesmo quadro (a pilha so aplica os comandos
+    /// no fim dele) empilhariam duas cabines.
+    bool entregouADestruicao_{false};
+
     SDL_FPoint posicao_{0.0f, 0.0f};
     SDL_FPoint posicaoAnterior_{0.0f, 0.0f};
     SDL_FlipMode espelho_{SDL_FLIP_NONE};

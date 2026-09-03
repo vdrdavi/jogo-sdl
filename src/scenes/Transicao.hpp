@@ -22,10 +22,13 @@ public:
     /// vazio do espaco: e nela que as duas metades emendam.
     static constexpr SDL_Color kCor{14, 30, 48, 255};
 
-    /// Fecha a cortina; quando termina, fica fechada ate alguem reabrir.
-    void iniciarSaida();
+    /// Fecha a cortina; quando termina, fica fechada ate alguem reabrir. A
+    /// duracao e argumento porque nem toda passagem tem a mesma pressa: a
+    /// troca entre conves e cabine e curta de proposito, e o apagar depois da
+    /// nave se despedacar e longo de proposito.
+    void iniciarSaida(float duracao = kDuracaoSaida);
     /// Abre a cortina a partir da tela cheia.
-    void iniciarEntrada();
+    void iniciarEntrada(float duracao = kDuracaoEntrada);
 
     /// Avanca um passo fixo. Devolve true no unico passo em que a saida acaba
     /// de cobrir a tela -- o instante de trocar de cena.
@@ -45,6 +48,7 @@ private:
 
     Modo modo_{Modo::Nenhuma};
     float t_{0.0f};  // progresso da metade atual, 0 a 1
+    float duracao_{kDuracaoSaida};
 };
 
 }  // namespace jogo

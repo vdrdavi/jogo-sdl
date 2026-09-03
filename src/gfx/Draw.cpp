@@ -1,5 +1,8 @@
 #include "gfx/Draw.hpp"
 
+#include <cmath>
+#include <vector>
+
 namespace jogo::draw {
 namespace {
 
@@ -103,6 +106,37 @@ void linhaMundo(SDL_Renderer* renderer, const Camera& camera, SDL_FPoint a, SDL_
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, cor.r, cor.g, cor.b, cor.a);
     SDL_RenderLine(renderer, ta.x, ta.y, tb.x, tb.y);
+}
+
+void brilhoAditivo(SDL_Renderer* renderer, SDL_FPoint centro, float raio, SDL_FColor cor) {
+    constexpr int kSegmentos = 12;
+    if (raio <= 0.5f) {
+        return;
+    }
+
+    std::vector<SDL_Vertex> leque;
+    leque.reserve(kSegmentos * 3);
+
+    const SDL_FColor transparente{cor.r, cor.g, cor.b, 0.0f};
+    for (int i = 0; i < kSegmentos; ++i) {
+        const float a0 = 6.2831853f * static_cast<float>(i) / kSegmentos;
+        const float a1 = 6.2831853f * static_cast<float>(i + 1) / kSegmentos;
+
+        const SDL_Vertex meio{centro, cor, {0.0f, 0.0f}};
+        const SDL_Vertex borda0{
+            SDL_FPoint{centro.x + std::cos(a0) * raio, centro.y + std::sin(a0) * raio},
+            transparente,
+            {0.0f, 0.0f}};
+        const SDL_Vertex borda1{
+            SDL_FPoint{centro.x + std::cos(a1) * raio, centro.y + std::sin(a1) * raio},
+            transparente,
+            {0.0f, 0.0f}};
+        leque.insert(leque.end(), {meio, borda0, borda1});
+    }
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD);
+    SDL_RenderGeometry(renderer, nullptr, leque.data(), static_cast<int>(leque.size()), nullptr, 0);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 }
 
 }  // namespace jogo::draw

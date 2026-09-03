@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <vector>
 
 #include "core/App.hpp"
 #include "gfx/BitmapFont.hpp"
 #include "gfx/Draw.hpp"
 #include "input/Input.hpp"
+#include "scenes/GameOverScene.hpp"
 
 namespace jogo {
 namespace {
@@ -20,38 +20,6 @@ constexpr SDL_Color kCorPainel{8, 12, 24, 170};
 /// Suavizacao exponencial estavel em passo fixo.
 float aproximar(float atual, float alvo, float taxa, float dt) {
     return atual + (alvo - atual) * (1.0f - std::exp(-taxa * dt));
-}
-
-/// Brilho radial aditivo (leque de triangulos) usado no escapamento do motor.
-void brilhoAditivo(SDL_Renderer* renderer, SDL_FPoint centro, float raio, SDL_FColor cor) {
-    constexpr int kSegmentos = 12;
-    if (raio <= 0.5f) {
-        return;
-    }
-
-    std::vector<SDL_Vertex> leque;
-    leque.reserve(kSegmentos * 3);
-
-    const SDL_FColor transparente{cor.r, cor.g, cor.b, 0.0f};
-    for (int i = 0; i < kSegmentos; ++i) {
-        const float a0 = 6.2831853f * static_cast<float>(i) / kSegmentos;
-        const float a1 = 6.2831853f * static_cast<float>(i + 1) / kSegmentos;
-
-        const SDL_Vertex meio{centro, cor, {0.0f, 0.0f}};
-        const SDL_Vertex borda0{
-            SDL_FPoint{centro.x + std::cos(a0) * raio, centro.y + std::sin(a0) * raio},
-            transparente,
-            {0.0f, 0.0f}};
-        const SDL_Vertex borda1{
-            SDL_FPoint{centro.x + std::cos(a1) * raio, centro.y + std::sin(a1) * raio},
-            transparente,
-            {0.0f, 0.0f}};
-        leque.insert(leque.end(), {meio, borda0, borda1});
-    }
-
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD);
-    SDL_RenderGeometry(renderer, nullptr, leque.data(), static_cast<int>(leque.size()), nullptr, 0);
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 }
 
 }  // namespace
@@ -81,9 +49,15 @@ void FlightScene::aoEntrar(Context& ctx) {
 
     // A vista abre do painel: a cortina que o conves fechou levanta daqui, e o
     // campo de visao comeca fechado e alarga sozinho na suavizacao que ja
-    // existia para o turbo.
-    transicao_.iniciarEntrada();
-    fov_ = kFovBase - kAberturaFov;
+    // existia para o turbo. Quando esta cena e aberta porque o casco cedeu, nao
+    // ha painel de onde abrir: o corte e seco de proposito -- foi o que
+    // aconteceu com a nave.
+    if (!voo_.destruida()) {
+        transicao_.iniciarEntrada();
+        fov_ = kFovBase - kAberturaFov;
+    } else {
+        fov_ = kFovBase;
+    }
 
     somSaida_ = ctx.audio.carregar("audio/back.wav");
     voo_.definirAbafado(false);
@@ -94,28 +68,63 @@ void FlightScene::aoSair(Context&) {
     voo_.definirAbafado(true);
 }
 
+void FlightScene::comecarDestruicao() {
+    morrendo_ = true;
+    tempoDeMorte_ = 0.0f;
+
+    // Os cacos nascem exatamente onde a nave estava, com a rotacao e a escala
+    // com que ela era desenhada e carregando a velocidade que ela tinha: no
+    // primeiro quadro eles ainda sao a nave, e so entao ela se abre.
+    const Mat3 rotacao = Flight::rotacaoDe(voo_.pose());
+    destrocos_.gerar(nave_, voo_.pose().posicao, rotacao, 1.15f,
+                     rotacao.frente() * voo_.velocidade(), 0x0DEADBEEu);
+}
+
 void FlightScene::atualizar(Context& ctx, float dt) {
     tempo_ += dt;
 
-    // Sair e fechar a cortina; a pilha so desempilha quando ela cobrir a tela,
-    // e do outro lado o conves reabre a partir dela. Enquanto isso nao chega,
-    // esta cena continua sendo quem da o passo do voo.
-    if (!transicao_.saindo() && (ctx.input.acaoPressionada(Acao::Voltar) ||
-                                 ctx.input.acaoPressionada(Acao::Pausar))) {
+    // O casco zerou: daqui para a frente esta cena so mostra o fim. Vale tanto
+    // para quem estava pilotando quanto para quem foi trazido do conves, e a
+    // condicao e o estado do voo -- nao um aviso que alguem precise mandar.
+    if (!morrendo_ && voo_.destruida()) {
+        comecarDestruicao();
+    }
+
+    if (morrendo_) {
+        tempoDeMorte_ += dt;
+        destrocos_.atualizar(dt);
+        // A cortina so comeca depois de os destrocos correrem: apagar em cima
+        // da explosao seria esconder justamente o que ha para ver.
+        if (tempoDeMorte_ >= kTempoDestrocos && !transicao_.saindo()) {
+            transicao_.iniciarSaida(kApagarDaMorte);
+        }
+    } else if (!transicao_.saindo() && (ctx.input.acaoPressionada(Acao::Voltar) ||
+                                        ctx.input.acaoPressionada(Acao::Pausar))) {
+        // Sair e fechar a cortina; a pilha so desempilha quando ela cobrir a
+        // tela, e do outro lado o conves reabre a partir dela. Enquanto isso
+        // nao chega, esta cena continua sendo quem da o passo do voo.
         ctx.audio.tocar(somSaida_);
         // O casco volta a abafar ja no comeco da cortina, para o som fechar
         // junto com a imagem; a rampa do Flight cuida de nao virar degrau.
         voo_.definirAbafado(true);
         transicao_.iniciarSaida();
     }
+
+    // A mesma cortina, dois destinos: no fim da viagem ela entrega a tela de
+    // fim; no fim da visita a cabine, devolve o conves.
     if (transicao_.avancar(dt)) {
-        ctx.cenas.desempilhar();
+        if (morrendo_) {
+            ctx.cenas.substituir(std::make_unique<GameOverScene>());
+        } else {
+            ctx.cenas.desempilhar();
+        }
     }
 
     // Com a cortina fechando, o piloto ja largou os controles: o voo segue no
     // automatico -- e recebe o passo do mesmo jeito, sem buraco na simulacao.
+    // Uma nave destruida nao le comando nenhum, com ou sem cortina.
     Flight::Comando comando;
-    if (!transicao_.saindo()) {
+    if (!transicao_.saindo() && !morrendo_) {
         comando.eixo = ctx.input.eixoMovimento();
         comando.turbo = ctx.input.acaoAtiva(Acao::Confirmar);
     }
@@ -127,7 +136,8 @@ void FlightScene::atualizar(Context& ctx, float dt) {
     const Mat3 rotacao = Flight::rotacaoDe(voo_.pose());
     cameraAnterior_ = camera_;
     const Vec3 desejada = voo_.pose().posicao + rotacao * Vec3{0.0f, 1.4f, 5.0f};
-    camera_ = lerp(camera_, desejada, 1.0f - std::exp(-kPerseguicaoCamera * dt));
+    const float perseguicao = morrendo_ ? kPerseguicaoMorte : kPerseguicaoCamera;
+    camera_ = lerp(camera_, desejada, 1.0f - std::exp(-perseguicao * dt));
     cameraCima_ = normalizar(lerp(cameraCima_, rotacao.cima(), 1.0f - std::exp(-6.0f * dt)));
 
     // Campo infinito: as estrelas sao reposicionadas em torno da camera.
@@ -166,16 +176,27 @@ void FlightScene::desenhar(Context& ctx, float alpha) {
     estrelas_.desenhar(ctx.renderer, cena_, rotacao.frente() * voo_.velocidade(), tempo_);
 
     voo_.rochas().submeter(cena_);
-    cena_.submeter(nave_, posicao, rotacao, 1.15f);
+    // A nave ou o que sobrou dela: nunca as duas. Os cacos entram no mesmo lote
+    // das rochas, entao o pintor os ordena junto com o resto da cena.
+    if (morrendo_) {
+        destrocos_.submeter(cena_);
+    } else {
+        cena_.submeter(nave_, posicao, rotacao, 1.15f);
+    }
     cena_.desenhar(ctx.renderer);
 
-    // Escapamento: brilha mais forte no turbo.
+    if (morrendo_) {
+        destrocos_.desenharFaiscas(ctx.renderer, cena_);
+    }
+
+    // Escapamento: brilha mais forte no turbo -- e some junto com o motor.
     SDL_FPoint motor;
     float profundidade = 0.0f;
-    if (cena_.projetar(posicao + rotacao * Vec3{0.0f, 0.05f, 1.75f}, motor, &profundidade)) {
+    if (!morrendo_ &&
+        cena_.projetar(posicao + rotacao * Vec3{0.0f, 0.05f, 1.75f}, motor, &profundidade)) {
         const float intensidade = 0.35f + 0.65f * voo_.fatorTurbo();
         const float tremor = 0.9f + 0.1f * std::sin(tempo_ * 30.0f);
-        brilhoAditivo(ctx.renderer, motor, cena_.escalaEmTela(profundidade) * 0.55f * tremor,
+        draw::brilhoAditivo(ctx.renderer, motor, cena_.escalaEmTela(profundidade) * 0.55f * tremor,
                       SDL_FColor{1.0f * intensidade, 0.55f * intensidade, 0.22f * intensidade,
                                  1.0f});
     }
@@ -188,6 +209,13 @@ void FlightScene::desenhar(Context& ctx, float alpha) {
                             SDL_FRect{0.0f, 0.0f, static_cast<float>(App::kLarguraLogica),
                                       static_cast<float>(App::kAlturaLogica)},
                             SDL_Color{255, 150, 90, alfa});
+    }
+
+    // Da destruicao em diante nao ha o que pilotar nem o que medir: a mira e a
+    // HUD saem de cena e sobra a vista.
+    if (morrendo_) {
+        transicao_.desenhar(ctx.renderer);
+        return;
     }
 
     // Mira

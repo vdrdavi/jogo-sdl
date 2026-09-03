@@ -57,6 +57,7 @@ void Flight::iniciar(Context& ctx, Uint32 semente) {
     ambiente_ = 0.0f;
     somAmbiente_ = ctx.audio.carregar("audio/espaco.wav");
     somImpacto_ = ctx.audio.carregar("audio/impacto.wav");
+    somDestruicao_ = ctx.audio.carregar("audio/destruicao.wav");
     vozAmbiente_ = ctx.audio.tocarEmLoop(somAmbiente_, ambiente_);
 }
 
@@ -81,29 +82,43 @@ Flight::Pose Flight::interpolada(float alpha) const {
 void Flight::atualizar(Context& ctx, float dt, const Comando& comando) {
     poseAnterior_ = pose_;
 
-    // Curva inclinada: o rolamento acompanha a guinada, como em um caca. Sem
-    // comando isso tudo tende a zero e a nave segue reto.
-    pose_.roll = aproximar(pose_.roll, -comando.eixo.x * 0.85f, 6.0f, dt);
-    pose_.yaw -= comando.eixo.x * kTaxaGiro * dt;
-    pose_.pitch =
-        std::clamp(pose_.pitch - comando.eixo.y * kTaxaPitch * dt, -kLimitePitch, kLimitePitch);
+    // Uma nave perdida nao obedece a ninguem: sem motor e sem atrito no vazio,
+    // o que sobra dela segue na direcao e na velocidade em que estava. Por isso
+    // so a integracao da posicao fica de fora deste "se" -- e e ela que mantem
+    // a camera com o que seguir enquanto os destrocos se abrem.
+    if (!destruida()) {
+        // Curva inclinada: o rolamento acompanha a guinada, como em um caca. Sem
+        // comando isso tudo tende a zero e a nave segue reto.
+        pose_.roll = aproximar(pose_.roll, -comando.eixo.x * 0.85f, 6.0f, dt);
+        pose_.yaw -= comando.eixo.x * kTaxaGiro * dt;
+        pose_.pitch =
+            std::clamp(pose_.pitch - comando.eixo.y * kTaxaPitch * dt, -kLimitePitch,
+                       kLimitePitch);
 
-    turbo_ = comando.turbo;
-    velocidade_ = aproximar(velocidade_, turbo_ ? kVelocidadeTurbo : kVelocidadeCruzeiro, 3.0f, dt);
+        turbo_ = comando.turbo;
+        velocidade_ =
+            aproximar(velocidade_, turbo_ ? kVelocidadeTurbo : kVelocidadeCruzeiro, 3.0f, dt);
+    }
     pose_.posicao += rotacaoDe(pose_).frente() * velocidade_ * dt;
 
     // Campo infinito: as rochas sao reposicionadas em torno da nave, que e
-    // quem colide com elas.
+    // quem colide com elas -- enquanto ha nave para colidir.
     rochas_.atualizar(dt);
     rochas_.centralizar(pose_.posicao);
-    checarColisao(ctx);
+    if (!destruida()) {
+        checarColisao(ctx);
+    }
     batida_ = std::max(0.0f, batida_ - kDecaimentoBatida * dt);
 
     // O ambiente entra do zero, acompanha o esforco do motor e cai quando o
     // casco fica no caminho. A rampa e aqui para a passagem entre o convés e a
-    // cabine ser um swell, e nao um degrau.
-    const float alvo = (kAmbienteCruzeiro + (kAmbienteTurbo - kAmbienteCruzeiro) * fatorTurbo()) *
-                       (abafado_ ? kAbafamento : 1.0f);
+    // cabine ser um swell, e nao um degrau -- e e a mesma rampa que, com a nave
+    // perdida, leva o alvo a zero: a sequencia de destruicao termina em silencio,
+    // que e de onde a tela de fim comeca.
+    const float alvo =
+        destruida() ? 0.0f
+                    : (kAmbienteCruzeiro + (kAmbienteTurbo - kAmbienteCruzeiro) * fatorTurbo()) *
+                          (abafado_ ? kAbafamento : 1.0f);
     ambiente_ = aproximar(ambiente_, alvo, kTaxaAmbiente, dt);
     ctx.audio.ajustarGanho(vozAmbiente_, ambiente_);
 }
@@ -117,12 +132,19 @@ void Flight::checarColisao(Context& ctx) {
     // A rocha vai para outro canto do cubo em vez de sumir: o campo mantem a
     // mesma densidade sem alocar nada.
     rochas_.reposicionar(atingida, pose_.posicao);
-    ctx.audio.tocar(somImpacto_, abafado_ ? 0.55f : 1.0f);
     velocidade_ = kVelocidadeAposBatida;
     batida_ = 1.0f;
-    // O estrago nao se desfaz: o casco so cai, e para no zero em vez de virar
-    // negativo -- o que acontece com a nave sem casco ainda nao e assunto daqui.
+    // O estrago nao se desfaz: o casco so cai, e para no zero.
     casco_ = std::max(0.0f, casco_ - kDanoPorBatida);
+
+    // A ultima rocha soa diferente das outras, e o estouro sai daqui e nao da
+    // cena: o casco pode ceder com o jogador no conves, no painel ou na cabine,
+    // e o som do fim da nave nao pode depender de quem estava desenhando.
+    if (destruida()) {
+        ctx.audio.tocar(somDestruicao_);
+    } else {
+        ctx.audio.tocar(somImpacto_, abafado_ ? 0.55f : 1.0f);
+    }
 }
 
 }  // namespace jogo

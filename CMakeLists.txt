@@ -35,6 +35,7 @@ add_executable(jogo
     src/sim/Flight.cpp
     src/world/MapaDeTiles.cpp
     src/gfx3d/AsteroidField.cpp
+    src/gfx3d/Destrocos.cpp
     src/gfx3d/Mesh.cpp
     src/gfx3d/Renderer3D.cpp
     src/gfx3d/Starfield.cpp
@@ -43,6 +44,7 @@ add_executable(jogo
     src/scenes/FlightScene.cpp
     src/scenes/PauseScene.cpp
     src/scenes/StatusScene.cpp
+    src/scenes/GameOverScene.cpp
     src/scenes/Transicao.cpp
 )
 

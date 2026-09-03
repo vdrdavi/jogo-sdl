@@ -24,4 +24,10 @@ void retanguloTela(SDL_Renderer* renderer, const SDL_FRect& retangulo, SDL_Color
 void linhaMundo(SDL_Renderer* renderer, const Camera& camera, SDL_FPoint a, SDL_FPoint b,
                 SDL_Color cor);
 
+/// Brilho radial aditivo em coordenadas de tela: um leque de triangulos que sai
+/// da cor no centro e chega transparente na borda. E o que faz as luzes do 3D
+/// (o escapamento do motor, as faiscas dos destrocos) somarem com o fundo em
+/// vez de recorta-lo, sem textura nem shader.
+void brilhoAditivo(SDL_Renderer* renderer, SDL_FPoint centro, float raio, SDL_FColor cor);
+
 }  // namespace jogo::draw

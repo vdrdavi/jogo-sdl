@@ -66,6 +66,11 @@ public:
     /// resto da viagem, e estado do Flight -- a nave leva o estrago batendo com
     /// o piloto no conves tanto quanto na cabine.
     float casco() const { return casco_; }
+    /// Casco zerado e nave perdida: nao ha um segundo estado para manter em dia.
+    /// A partir daqui o Flight nao manobra, nao acelera e nao colide -- so
+    /// carrega para a frente o que sobrou, para a camera ter o que seguir
+    /// enquanto a cena mostra os destrocos.
+    bool destruida() const { return casco_ <= 0.0f; }
 
     const AsteroidField& rochas() const { return rochas_; }
 
@@ -85,6 +90,7 @@ private:
     bool abafado_{true};
     Audio::SomId somAmbiente_{0};
     Audio::SomId somImpacto_{0};
+    Audio::SomId somDestruicao_{0};
     Audio::VozId vozAmbiente_{0};
 };
 

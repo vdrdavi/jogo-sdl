@@ -820,6 +820,43 @@ mantém a mesma densidade sem alocar nem liberar nada.
 
 ---
 
+### 11.2 Os destroços: quebrar uma malha sem um segundo modelo
+
+Arquivo: [`src/gfx3d/Destrocos.cpp`](../src/gfx3d/Destrocos.cpp).
+
+Quando a nave se perde, ela **não é trocada por um modelo de "nave quebrada"**.
+Cada face da malha vira um caco, e cada caco é um **tetraedro**: os três vértices
+da face mais o centro da malha. Isso dá duas coisas de graça.
+
+A primeira é que os cacos, juntos e parados, ainda *são* a nave — a mesma pele,
+nas mesmas posições. No instante da destruição nada pisca nem troca de forma: o
+que estava lá começa a se afastar. (O caco nasce centrado no próprio centroide,
+para girar em torno de si mesmo; o que sobra vira a posição dele no mundo.)
+
+A segunda é que um tetraedro é **fechado**. Um triângulo solto seria descartado
+sempre que fosse visto por trás (o culling da seção 11 olha a normal) e piscaria
+a cada tombo; um sólido nunca some. As três faces internas ganham a cor da face
+original escurecida: o caco tem frente e avesso em vez de parecer papel.
+
+O resto é integração simples, e nenhuma parte disso é simulação: os cacos não
+colidem com nada e ninguém depende deles.
+
+- Cada caco sai **para fora do centro da nave**, na direção em que a peça já
+  estava — por isso a nave *se abre* em vez de espirrar para um lado só — e
+  **herda a velocidade que a nave tinha**, senão a explosão ficaria para trás da
+  câmera no primeiro segundo.
+- O tombo é recomposto do ângulo a cada quadro e aplicado **por cima** da
+  orientação de origem (`base * deEuler(yaw, pitch, 0)`): o mesmo cuidado do
+  campo de asteroides, para não acumular erro, mais a garantia de que no primeiro
+  quadro o conjunto ainda é a nave inteira.
+- As **faíscas** não são malhas. São pontos projetados e desenhados como brilhos
+  aditivos (`draw::brilhoAditivo`, o mesmo do escapamento do motor), com a
+  direção sorteada por rejeição dentro de um cubo — sortear dois ângulos
+  acumularia faísca nos polos — e o brilho caindo com o quadrado do que resta de
+  vida, porque o apagar linear parecia desligar de uma vez.
+
+---
+
 ## 12. O voo
 
 Arquivo: [`src/sim/Flight.cpp`](../src/sim/Flight.cpp).
@@ -873,9 +910,29 @@ palavra do mostrador.
 A batida também **cobra o casco**: `casco_` começa em 1, cai 0,125 por rocha e
 para no zero — oito batidas do casco inteiro ao nada. É um valor da *viagem*, e
 por isso mora aqui e não na tela que o mostra: a nave se estraga batendo com o
-piloto no convés tanto quanto na cabine, e o mostrador é só quem lê
-`casco()`. O que acontece com uma nave de casco zerado ainda não é assunto do
-`Flight`: ele grampeia e segue voando.
+piloto no convés tanto quanto na cabine, e o mostrador é só quem lê `casco()`.
+
+### Quando o casco zera
+
+Não há um segundo estado para manter em dia: `destruida()` **é** `casco() <= 0`.
+Um `bool` separado seria mais uma coisa que pode discordar do mostrador.
+
+A oitava rocha soa diferente das outras — o estouro é tocado aqui, e não pela
+cena, porque o casco pode ceder com o jogador no convés, no painel ou na cabine,
+e o som do fim da nave não pode depender de quem estava desenhando. Do passo
+seguinte em diante o `Flight` muda de comportamento:
+
+- **não manobra e não acelera.** Só a integração da posição fica fora do `if`:
+  sem motor e sem atrito no vazio, o que sobra segue na direção e na velocidade
+  em que estava (18 u/s, a velocidade que a batida deixou). É essa deriva que dá
+  à câmera o que seguir enquanto os destroços se abrem;
+- **não colide.** Sem isso o casco continuaria "batendo" em rochas e tocando
+  baques depois de ter deixado de existir;
+- **cala o ambiente.** O alvo do ganho vai a zero pela mesma rampa de sempre, e a
+  sequência termina em silêncio — que é de onde a tela de fim começa.
+
+`Pose` guarda posição e os três ângulos, e o `Flight` mantém a pose anterior para
+`interpolada(alpha)` (seção 2).
 
 ### O som que atravessa o casco
 
@@ -914,6 +971,7 @@ baixo, porque a ordem das coisas ali é toda deliberada:
 ```cpp
 voo_.atualizar(ctx, dt, Flight::Comando{});    // sempre, antes de qualquer saída
 if (transicao_.ativa()) { ... return; }        // cortina em cena: ninguém comanda nada
+if (voo_.destruida()) { ... return; }          // entrega a vista externa
 if (acaoPressionada(Pausar)) { ... return; }   // empilha a pausa
 if (pertoDoConsole() && acaoPressionada(Diagnostico)) { ... return; } // empilha o casco
 if (pertoDoConsole() && acaoPressionada(Interagir)) { ... return; }   // fecha a cortina
@@ -924,6 +982,14 @@ camera_.seguir(posicao_, dt, 7.0f);
 O passo do voo vem **antes das saídas antecipadas**: qualquer `return` acima dele
 faria a viagem perder passos. E enquanto a cortina está em cena, nenhuma tecla é
 lida — um segundo `E` empilharia uma segunda cabine.
+
+A checagem do casco vem logo depois dele, antes de tudo o mais — inclusive de uma
+cortina que já estivesse fechando. Não há o que fazer no convés de uma nave que
+acabou de se abrir: a `FlightScene` é empilhada **sem cortina** (o casco não se
+rompe com educação) e é ela que mostra o que aconteceu. Uma trava
+(`entregouADestruicao_`) guarda que isso já foi pedido: como a pilha só aplica os
+comandos no fim do quadro, dois passos fixos no mesmo quadro empilhariam duas
+cabines.
 
 Também é aqui que o `Flight` nasce (`aoEntrar`) e morre (`aoSair`): a viagem dura
 exatamente o tempo desta cena.
@@ -978,6 +1044,31 @@ O FOV também nasce 12° mais fechado e abre sozinho, pela mesma suavização qu
 existia para o turbo: a vista **abre do painel para o espaço** em vez de aparecer
 pronta.
 
+#### A sequência de destruição
+
+Esta é também a cena onde a nave acaba, venha o jogador de onde vier. A condição
+é o estado do voo (`voo_.destruida()`), e não um aviso que alguém precise mandar:
+quem chega aqui já morto — trazido do convés ou do painel do casco — cai na mesma
+linha que quem morreu pilotando. Quando isso acontece:
+
+- `comecarDestruicao()` estilhaça a malha da nave (seção 11.2) na pose, rotação e
+  escala em que ela estava sendo desenhada, e passa a velocidade dela aos cacos;
+- `morrendo_` desliga o resto da cena: nenhum comando é lido (a tecla que voltava
+  ao convés não pode voltar para uma nave que não existe), a mira e a HUD saem, o
+  escapamento some junto com o motor, e no lugar da nave vão os destroços;
+- a câmera **afrouxa a perseguição** (de 9 para 2,2 por segundo): o que ela segue
+  agora é a deriva do que sobrou, e o atraso maior abre distância dela;
+- passados 1,9 s, a cortina começa a fechar — devagar, 1,4 s, e não os 0,24 s da
+  passagem para o convés. Apagar antes disso seria esconder justamente o que há
+  para ver;
+- no passo em que a tela fica coberta, `substituir` troca esta cena pela
+  `GameOverScene`.
+
+Note que a cortina é a mesma de sempre, com **dois destinos**: `desempilhar` no
+fim de uma visita à cabine, `substituir` no fim da viagem. E quando esta cena é
+aberta já com a nave perdida, ela **não toca a cortina de entrada**: o corte é
+seco de propósito — foi o que aconteceu com a nave.
+
 ### StatusScene
 
 A outra opção do painel: `Q`, junto ao console, abre o **diagnóstico do casco** —
@@ -1005,12 +1096,29 @@ e **nunca encosta**, então o ponteiro é encaixado no casco quando a diferença
 abaixo de 0,001 — senão sobraria para sempre uma lasca de vermelho de menos de um
 pixel na ponta da barra.
 
+Se o mostrador chega a zero, não há diagnóstico a fazer: esta cena **se troca**
+pela `FlightScene` (`substituir`, não `empilhar`). Trocar é o que deixa a pilha
+idêntica à dos outros caminhos até o fim — `MenuScene ▸ InteriorScene ▸
+FlightScene` —, e é por isso que a `GameOverScene` pode desempilhar sempre os
+mesmos dois degraus para voltar ao menu.
+
 ### PauseScene
 
 O exemplo mais limpo do que a pilha de cenas compra: quatro linhas de lógica,
 `bloqueiaRender()` devolvendo `false`, e a partida fica congelada e visível atrás
 de um véu. `M` desempilha duas vezes — sai da pausa e da partida, voltando ao
 menu que ficou na base da pilha.
+
+### GameOverScene
+
+Uma tela e duas teclas. O que ela tem de interessante é a aritmética da pilha:
+como os três caminhos até a morte convergem em `MenuScene ▸ InteriorScene ▸
+FlightScene`, e ela **substitui** a `FlightScene`, voltar ao menu é sempre
+desempilhar dois degraus — esta tela e a partida congelada embaixo dela. Quem
+encerra a viagem de fato é o `aoSair` da `InteriorScene`, que apaga o ambiente.
+
+Ela também **ignora as teclas enquanto a cortina ainda está abrindo**: a tecla
+que o jogador estava segurando quando a nave se abriu não pode pular o fim.
 
 ### A cortina entre o convés e a cabine
 
@@ -1045,6 +1153,12 @@ coberta até a cena de destino aparecer.
 
 `avancar(dt)` devolve `true` **em um único passo**: aquele em que a saída acabou
 de cobrir a tela. Esse é o instante da troca.
+
+A duração de cada metade é **argumento**, com o valor de sempre como padrão:
+nem toda passagem tem a mesma pressa. A troca entre convés e cabine é curta de
+propósito (0,24 s + 0,20 s, curta o bastante para não virar espera); o apagar
+depois de a nave se despedaçar é longo de propósito (1,4 s), e a tela de fim abre
+em 0,9 s — o fim da nave não volta a ser jogo em 0,2 s.
 
 Duas escolhas de acabamento: a curva é uma **smoothstep** (`t²(3−2t)`, que sai e
 chega parada) porque a rampa linear fazia a passagem parecer mais curta do que

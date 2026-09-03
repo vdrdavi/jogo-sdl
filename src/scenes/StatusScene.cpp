@@ -8,6 +8,7 @@
 #include "gfx/BitmapFont.hpp"
 #include "gfx/Draw.hpp"
 #include "input/Input.hpp"
+#include "scenes/FlightScene.hpp"
 
 namespace jogo {
 namespace {
@@ -65,6 +66,19 @@ void StatusScene::atualizar(Context& ctx, float dt) {
     // sobraria para sempre uma lasca de vermelho de menos de um pixel na barra.
     if (std::fabs(ponteiro_ - voo_.casco()) < 0.001f) {
         ponteiro_ = voo_.casco();
+    }
+
+    // O mostrador chegou a zero: nao ha diagnostico a fazer em uma nave que
+    // acabou de se romper. Esta cena se troca pela vista externa -- trocar, e
+    // nao empilhar, deixa a pilha igualzinha a dos outros caminhos ate o fim
+    // (MenuScene > InteriorScene > FlightScene).
+    if (voo_.destruida() && !entregouADestruicao_) {
+        entregouADestruicao_ = true;
+        ctx.cenas.substituir(std::make_unique<FlightScene>(voo_));
+        return;
+    }
+    if (entregouADestruicao_) {
+        return;
     }
 
     if (ctx.input.acaoPressionada(Acao::Voltar) || ctx.input.acaoPressionada(Acao::Pausar) ||

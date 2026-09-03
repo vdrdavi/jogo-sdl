@@ -32,13 +32,14 @@ src/
 │  ├─ Mesh.*             malha low poly com cor por face + a nave e as rochas
 │  ├─ Renderer3D.*       projeção, recorte, culling, névoa, pintor, RenderGeometry
 │  ├─ Starfield.*        campo de estrelas procedural com rastro
-│  └─ AsteroidField.*    campo de asteroides com wrap e colisão esfera-esfera
+│  ├─ AsteroidField.*    campo de asteroides com wrap e colisão esfera-esfera
+│  └─ Destrocos.*        os cacos e as faíscas da nave que se despedaçou
 ├─ sim/Flight.*          o voo da nave: pose, rochas, colisão e o ambiente
 ├─ world/MapaDeTiles.*   grade de tiles lida de um arquivo em assets/maps/
 ├─ audio/Audio.*         WAVs em memória, vozes (e loops) mixados pelo dispositivo
 ├─ scene/                Scene (interface) e SceneStack (transições adiadas)
 └─ scenes/               MenuScene, InteriorScene, FlightScene, StatusScene,
-                         PauseScene
+                         PauseScene, GameOverScene
 ```
 
 Quem é dono de tudo é o `App`: ele cria janela, renderer e subsistemas, e passa
@@ -62,7 +63,10 @@ O voo da nave não pertence a nenhuma tela: `sim/Flight.*` é o estado da viagem
 e vive na `InteriorScene`, que o atualiza em piloto automático enquanto o jogador
 anda pelo convés. A `FlightScene` recebe uma referência para o mesmo `Flight` e
 apenas o comanda e o desenha — sair da cabine não interrompe o voo, e uma batida
-com o jogador lá dentro chega como sacudida da câmera e um baque abafado.
+com o jogador lá dentro chega como sacudida da câmera e um baque abafado. Cada
+batida também cobra um pedaço do casco; quando ele zera, a nave está perdida, e
+quem quer que esteja no topo da pilha entrega a vez à `FlightScene`, que mostra
+os destroços de fora e termina na `GameOverScene`.
 
 `bloqueiaUpdate()` e `bloqueiaRender()` controlam se as cenas abaixo continuam
 simulando e aparecendo — é assim que a `PauseScene` congela a partida sem

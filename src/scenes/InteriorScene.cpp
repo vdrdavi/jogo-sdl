@@ -157,6 +157,19 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
     // FlightScene esta no topo, ela e quem chama isto (e esta cena nem roda).
     voo_.atualizar(ctx, dt, Flight::Comando{});
 
+    // O casco cedeu enquanto o jogador andava aqui dentro. Nao ha o que fazer
+    // no conves de uma nave que acabou de se abrir: a vista vai para fora, que
+    // e de onde se ve o que aconteceu. Sem cortina, e antes de qualquer outra
+    // coisa -- inclusive de uma que ja estivesse fechando.
+    if (voo_.destruida() && !entregouADestruicao_) {
+        entregouADestruicao_ = true;
+        ctx.cenas.empilhar(std::make_unique<FlightScene>(voo_));
+        return;
+    }
+    if (entregouADestruicao_) {
+        return;
+    }
+
     // Com a cortina em cena o jogador ja nao comanda nada: nenhuma tecla e lida
     // (um segundo E empilharia uma segunda cabine) e a camera termina o
     // movimento sozinha. O voo, esse, continua recebendo o passo la em cima.

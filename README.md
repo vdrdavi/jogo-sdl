@@ -4,7 +4,8 @@ Você anda pelo interior de uma nave em 2D, usa o painel de pilotagem do convés
 a tela vira um voo 3D: um caça low poly atravessando um campo de estrelas gerado
 proceduralmente, desviando de asteroides. O mesmo painel também abre o
 diagnóstico do casco, que perde um pedaço a cada rocha — inclusive nas batidas
-que acontecem enquanto você anda lá dentro.
+que acontecem enquanto você anda lá dentro. Quando o casco acaba, a nave se
+despedaça na vista externa e a viagem termina ali.
 
 ![Interior da nave: convés de tiles, janelas para o espaço e o painel de pilotagem com o convite para assumir os controles](docs/interior.png)
 
@@ -118,6 +119,7 @@ cmake --preset debug -DCMAKE_PREFIX_PATH="$HOME/sdl3"
 | Pausar | Esc ou P | Start |
 | Tela cheia | F11 | — |
 | Menu (na pausa) | M | — |
+| Voltar ao menu (fim de jogo) | Enter ou Esc | A / B / Start |
 
 As preferências — volume, tela cheia e os vínculos de cada ação — são gravadas
 em `config.ini` no diretório de configuração do sistema (`SDL_GetPrefPath`:

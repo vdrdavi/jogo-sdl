@@ -16,14 +16,16 @@ float suavizar(float t) {
 
 }  // namespace
 
-void Transicao::iniciarSaida() {
+void Transicao::iniciarSaida(float duracao) {
     modo_ = Modo::Saindo;
     t_ = 0.0f;
+    duracao_ = std::max(duracao, 0.001f);
 }
 
-void Transicao::iniciarEntrada() {
+void Transicao::iniciarEntrada(float duracao) {
     modo_ = Modo::Entrando;
     t_ = 0.0f;
+    duracao_ = std::max(duracao, 0.001f);
 }
 
 bool Transicao::avancar(float dt) {
@@ -32,7 +34,7 @@ bool Transicao::avancar(float dt) {
     }
 
     const float anterior = t_;
-    t_ = std::min(1.0f, t_ + dt / (modo_ == Modo::Saindo ? kDuracaoSaida : kDuracaoEntrada));
+    t_ = std::min(1.0f, t_ + dt / duracao_);
 
     if (modo_ == Modo::Entrando) {
         if (t_ >= 1.0f) {
