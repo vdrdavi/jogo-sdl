@@ -1094,6 +1094,29 @@ vez**, e o arquivo termina com `volume=0.39`. Sem a espera seriam 30 reescritas.
 Build limpo do zero nos dois presets, sem nenhum warning, e o teste de fumaça sem
 sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 
+### 2026-09-03 — O preset release troca `RelWithDebInfo` por `Release`
+
+**O pedido:** o preset `release` usava `CMAKE_BUILD_TYPE=RelWithDebInfo`; trocar
+para `Release` puro, para ter o desempenho máximo que o compilador consegue dar.
+
+**A decisão e o porquê.** `RelWithDebInfo` otimiza com `-O2` e mantém os
+**símbolos de debug** (`-g`) no binário — um meio-termo que troca um pouco de
+velocidade por continuar depurável mesmo em release. `Release` sobe o **nível
+de otimização** para `-O3` (o máximo) e não grava símbolos, então o binário sai
+menor e sem a informação que liga instrução a linha de código. Como o projeto
+não tem suíte de testes automatizada — o build já é o próprio controle de
+qualidade (seção 2.1) — abrir mão dos símbolos em release custa mais caro aqui
+do que em um projeto com testes: um crash que só aparece com otimização ligada
+fica mais difícil de investigar depois. Ainda assim, a troca foi um pedido
+explícito priorizando desempenho sobre essa rede de segurança; nada no código
+depende do tipo de build, então a mudança é só a `cacheVariable` em
+[`CMakePresets.json`](../CMakePresets.json).
+
+**Como foi conferido:** `cmake --preset release && cmake --build build/release`
+do zero, sem warning novo, e o teste de fumaça sem sessão gráfica
+(`SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build/release/jogo`) sobe e sai
+normalmente.
+
 ## Glossário
 
 | Termo | O que é |
@@ -1132,6 +1155,7 @@ sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 | **Malha (mesh)** | Lista de vértices mais a lista de triângulos que os indexam. |
 | **Marcador** | Ponto nomeado do cenário (ex.: onde fica o console), em coordenadas de tile. |
 | **Mixar** | Somar várias fontes de áudio em uma saída. |
+| **Nível de otimização (-O)** | Quanto o compilador pode reorganizar o código para ficar mais rápido; `-O2` é um degrau abaixo do máximo (`-O3`). |
 | **Névoa (fog)** | Misturar a cor das faces com a cor do fundo conforme a distância. |
 | **Normal** | Vetor perpendicular a uma face; diz para que lado ela aponta. |
 | **Overlay** | Cena desenhada por cima de outra, que continua aparecendo atrás. |
@@ -1147,6 +1171,7 @@ sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 | **Scancode** | Código físico da tecla, independente do layout do teclado. |
 | **Seção de choque** | Área efetiva do alvo em um cálculo de colisão. |
 | **Shader** | Programa que roda na placa de vídeo. Este projeto não usa nenhum. |
+| **Símbolos de debug** | Informação extra no binário que liga cada instrução ao arquivo e linha de origem; sem ela, investigar um crash é bem mais difícil. |
 | **Sombreamento flat** | Uma cor por face, sem interpolar entre vértices. |
 | **Smoothstep** | Curva `t²(3−2t)`: vai de 0 a 1 saindo e chegando parada. |
 | **Sutherland–Hodgman** | Algoritmo de recorte de polígono contra um plano. |
