@@ -13,7 +13,8 @@ src/
 ├─ core/
 │  ├─ App.*              janela, renderer, laço principal, F11, FPS no título
 │  ├─ Time.hpp           StepTimer: acumulador de passo fixo + alpha
-│  ├─ Paths.*            resolução do diretório de assets
+│  ├─ Paths.*            diretório de assets e diretório de preferências
+│  ├─ Config.*           lê e grava as preferências (volume, tela cheia, teclas)
 │  ├─ Context.hpp        referências dos subsistemas entregues às cenas
 │  ├─ SdlPtr.hpp         unique_ptr para os tipos do SDL
 │  ├─ Aleatorio.hpp      xorshift32 semeado (estrelas, rochas)
@@ -100,6 +101,22 @@ Qualquer falha de leitura (arquivo ausente, linha da grade com comprimento
 diferente, caractere fora da legenda) é logada e substituída por uma sala
 fechada de emergência: um cenário quebrado degrada o jogo, não o derruba.
 
+## Preferências do jogador
+
+Volume, tela cheia e vínculos de controle são gravados em `config.ini` dentro de
+`SDL_GetPrefPath` (`paths::prefRoot()`), o único lugar onde o jogo escreve — o
+diretório de assets pode ser somente leitura e não acompanha o usuário.
+
+[`core/Config.*`](../src/core/Config.hpp) **não guarda cópia dos valores**: cada
+preferência já tem um dono (o volume é do `Audio`, a tela cheia é da janela, os
+vínculos são do `Input`) e o módulo só leva esses valores para o disco e de
+volta. Quem dispara a gravação é o `App`, com uma espera de 0,6 s desde a última
+mudança, para segurar a seta do volume não reescrever o arquivo 60 vezes por
+segundo.
+
+Uma preferência nova é uma chave nova nas duas funções de `Config.cpp` e um
+`marcarConfigSuja()` onde ela muda.
+
 ## Como adicionar assets
 
 Solte os arquivos em `assets/` e carregue pelo caminho relativo:
@@ -127,6 +144,11 @@ As cenas consultam **ações** (`Acao::Interagir`, `Acao::Confirmar`, ...), nunc
 teclas cruas: o mapeamento para teclado e gamepad vive em uma tabela única no
 começo de [`src/input/Input.cpp`](../src/input/Input.cpp). Adicionar um comando
 é acrescentar um valor ao enum e uma linha na tabela.
+
+A tabela é o **ponto de partida**, não a palavra final: o mapa em vigor é estado
+do `Input` (`mapeamento`/`definirMapeamento`/`restaurarPadroes`), e é isso que
+permite a `core/Config.*` reescrevê-lo com o que estiver no arquivo de
+preferências.
 
 As bordas (`acaoPressionada`) sobrevivem a quadros que não rodaram nenhum passo
 de simulação. Isso importa: com a tela a 240 Hz e a simulação a 60 Hz, três de

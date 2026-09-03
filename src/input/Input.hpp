@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstddef>
+#include <string_view>
 #include <vector>
 
 #include "core/SdlPtr.hpp"
@@ -11,7 +12,8 @@
 namespace jogo {
 
 /// Acoes logicas do jogo. As cenas consultam acoes, nunca teclas cruas, para
-/// que o remapeamento fique concentrado na tabela de Input.cpp.
+/// que o remapeamento fique concentrado na tabela do Input -- que comeca nos
+/// vinculos de fabrica de Input.cpp e pode ser reescrita pela configuracao.
 enum class Acao {
     Esquerda,
     Direita,
@@ -24,10 +26,33 @@ enum class Acao {
     Contagem,
 };
 
+/// Nome estavel da acao, na mesma ordem do enum. E o que aparece como chave no
+/// arquivo de configuracao, entao renomear aqui invalida os vinculos salvos.
+std::string_view nomeDaAcao(Acao acao);
+
+/// Acao de um nome; Acao::Contagem quando o nome nao existe.
+Acao acaoPorNome(std::string_view nome);
+
 /// Snapshot de entrada por quadro: alem do estado atual guarda o do quadro
 /// anterior, o que da as consultas de borda (pressionada/soltada).
 class Input {
 public:
+    static constexpr std::size_t kNumAcoes = static_cast<std::size_t>(Acao::Contagem);
+    static constexpr int kMaxTeclasPorAcao = 3;
+    static constexpr int kMaxBotoesPorAcao = 2;
+
+    /// Vinculos de uma acao. As posicoes nao usadas ficam em
+    /// SDL_SCANCODE_UNKNOWN / SDL_GAMEPAD_BUTTON_INVALID, que as consultas
+    /// ignoram -- e por isso um vinculo pode ser removido sem buraco na tabela.
+    struct Mapeamento {
+        std::array<SDL_Scancode, kMaxTeclasPorAcao> teclas{
+            SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN};
+        std::array<SDL_GamepadButton, kMaxBotoesPorAcao> botoes{
+            SDL_GAMEPAD_BUTTON_INVALID, SDL_GAMEPAD_BUTTON_INVALID};
+    };
+
+    Input();
+
     void iniciar();
 
     /// Inicio do quadro: arquiva o estado anterior e le teclado, mouse e gamepads.
@@ -60,6 +85,16 @@ public:
 
     bool temGamepad() const { return !gamepads_.empty(); }
 
+    /// Vinculos em vigor de uma acao, e como troca-los (o remapeamento). O mapa
+    /// e estado do Input, e nao uma tabela constante, justamente para que a
+    /// configuracao possa reescreve-lo ao carregar.
+    const Mapeamento& mapeamento(Acao acao) const;
+    void definirMapeamento(Acao acao, const Mapeamento& mapeamento);
+
+    /// Os vinculos de fabrica, para comparar ou voltar atras.
+    static const Mapeamento& mapeamentoPadrao(Acao acao);
+    void restaurarPadroes();
+
 private:
     void abrirGamepad(SDL_JoystickID id);
     void fecharGamepad(SDL_JoystickID id);
@@ -70,6 +105,8 @@ private:
         SDL_JoystickID id{0};
         GamepadPtr pad;
     };
+
+    std::array<Mapeamento, kNumAcoes> mapa_{};
 
     std::array<bool, SDL_SCANCODE_COUNT> teclas_{};
     std::array<bool, SDL_SCANCODE_COUNT> teclasAntes_{};

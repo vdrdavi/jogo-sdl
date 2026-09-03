@@ -9,42 +9,42 @@ namespace jogo {
 namespace {
 
 constexpr float kZonaMorta = 0.25f;
-constexpr std::size_t kNumAcoes = static_cast<std::size_t>(Acao::Contagem);
-constexpr int kMaxTeclasPorAcao = 3;
-constexpr int kMaxBotoesPorAcao = 2;
+constexpr std::size_t kNumAcoes = Input::kNumAcoes;
 
-struct Mapeamento {
-    SDL_Scancode teclas[kMaxTeclasPorAcao];
-    SDL_GamepadButton botoes[kMaxBotoesPorAcao];
-};
-
-/// Tabela unica de bindings; a ordem segue o enum Acao.
-constexpr std::array<Mapeamento, kNumAcoes> kMapa{{
+/// Vinculos de fabrica; a ordem segue o enum Acao. Sao o ponto de partida do
+/// mapa que o Input carrega, e para onde restaurarPadroes() volta.
+constexpr std::array<Input::Mapeamento, kNumAcoes> kPadrao{{
     // Esquerda
-    {{SDL_SCANCODE_LEFT, SDL_SCANCODE_A, SDL_SCANCODE_UNKNOWN},
-     {SDL_GAMEPAD_BUTTON_DPAD_LEFT, SDL_GAMEPAD_BUTTON_INVALID}},
+    {{{SDL_SCANCODE_LEFT, SDL_SCANCODE_A, SDL_SCANCODE_UNKNOWN}},
+     {{SDL_GAMEPAD_BUTTON_DPAD_LEFT, SDL_GAMEPAD_BUTTON_INVALID}}},
     // Direita
-    {{SDL_SCANCODE_RIGHT, SDL_SCANCODE_D, SDL_SCANCODE_UNKNOWN},
-     {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, SDL_GAMEPAD_BUTTON_INVALID}},
+    {{{SDL_SCANCODE_RIGHT, SDL_SCANCODE_D, SDL_SCANCODE_UNKNOWN}},
+     {{SDL_GAMEPAD_BUTTON_DPAD_RIGHT, SDL_GAMEPAD_BUTTON_INVALID}}},
     // Cima
-    {{SDL_SCANCODE_UP, SDL_SCANCODE_W, SDL_SCANCODE_UNKNOWN},
-     {SDL_GAMEPAD_BUTTON_DPAD_UP, SDL_GAMEPAD_BUTTON_INVALID}},
+    {{{SDL_SCANCODE_UP, SDL_SCANCODE_W, SDL_SCANCODE_UNKNOWN}},
+     {{SDL_GAMEPAD_BUTTON_DPAD_UP, SDL_GAMEPAD_BUTTON_INVALID}}},
     // Baixo
-    {{SDL_SCANCODE_DOWN, SDL_SCANCODE_S, SDL_SCANCODE_UNKNOWN},
-     {SDL_GAMEPAD_BUTTON_DPAD_DOWN, SDL_GAMEPAD_BUTTON_INVALID}},
+    {{{SDL_SCANCODE_DOWN, SDL_SCANCODE_S, SDL_SCANCODE_UNKNOWN}},
+     {{SDL_GAMEPAD_BUTTON_DPAD_DOWN, SDL_GAMEPAD_BUTTON_INVALID}}},
     // Confirmar
-    {{SDL_SCANCODE_RETURN, SDL_SCANCODE_SPACE, SDL_SCANCODE_KP_ENTER},
-     {SDL_GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_INVALID}},
+    {{{SDL_SCANCODE_RETURN, SDL_SCANCODE_SPACE, SDL_SCANCODE_KP_ENTER}},
+     {{SDL_GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_INVALID}}},
     // Voltar
-    {{SDL_SCANCODE_ESCAPE, SDL_SCANCODE_BACKSPACE, SDL_SCANCODE_UNKNOWN},
-     {SDL_GAMEPAD_BUTTON_EAST, SDL_GAMEPAD_BUTTON_BACK}},
+    {{{SDL_SCANCODE_ESCAPE, SDL_SCANCODE_BACKSPACE, SDL_SCANCODE_UNKNOWN}},
+     {{SDL_GAMEPAD_BUTTON_EAST, SDL_GAMEPAD_BUTTON_BACK}}},
     // Pausar
-    {{SDL_SCANCODE_ESCAPE, SDL_SCANCODE_P, SDL_SCANCODE_UNKNOWN},
-     {SDL_GAMEPAD_BUTTON_START, SDL_GAMEPAD_BUTTON_INVALID}},
+    {{{SDL_SCANCODE_ESCAPE, SDL_SCANCODE_P, SDL_SCANCODE_UNKNOWN}},
+     {{SDL_GAMEPAD_BUTTON_START, SDL_GAMEPAD_BUTTON_INVALID}}},
     // Interagir
-    {{SDL_SCANCODE_E, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN},
-     {SDL_GAMEPAD_BUTTON_WEST, SDL_GAMEPAD_BUTTON_INVALID}},
+    {{{SDL_SCANCODE_E, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN}},
+     {{SDL_GAMEPAD_BUTTON_WEST, SDL_GAMEPAD_BUTTON_INVALID}}},
 }};
+
+/// Nomes das acoes, tambem na ordem do enum.
+constexpr std::array<std::string_view, kNumAcoes> kNomes{
+    "esquerda", "direita", "cima",   "baixo",
+    "confirmar", "voltar", "pausar", "interagir",
+};
 
 float normalizarEixo(Sint16 bruto) {
     const float valor = static_cast<float>(bruto) / 32767.0f;
@@ -61,6 +61,39 @@ float aplicarZonaMorta(float valor) {
 }
 
 }  // namespace
+
+std::string_view nomeDaAcao(Acao acao) {
+    return kNomes[static_cast<std::size_t>(acao)];
+}
+
+Acao acaoPorNome(std::string_view nome) {
+    for (std::size_t i = 0; i < kNumAcoes; ++i) {
+        if (kNomes[i] == nome) {
+            return static_cast<Acao>(i);
+        }
+    }
+    return Acao::Contagem;
+}
+
+Input::Input() {
+    restaurarPadroes();
+}
+
+const Input::Mapeamento& Input::mapeamento(Acao acao) const {
+    return mapa_[static_cast<std::size_t>(acao)];
+}
+
+void Input::definirMapeamento(Acao acao, const Mapeamento& mapeamento) {
+    mapa_[static_cast<std::size_t>(acao)] = mapeamento;
+}
+
+const Input::Mapeamento& Input::mapeamentoPadrao(Acao acao) {
+    return kPadrao[static_cast<std::size_t>(acao)];
+}
+
+void Input::restaurarPadroes() {
+    mapa_ = kPadrao;
+}
 
 void Input::iniciar() {
     int total = 0;
@@ -187,7 +220,7 @@ bool Input::botaoGamepadPressionado(SDL_GamepadButton botao) const {
 }
 
 bool Input::acaoAtiva(Acao acao) const {
-    const Mapeamento& m = kMapa[static_cast<std::size_t>(acao)];
+    const Mapeamento& m = mapeamento(acao);
     for (SDL_Scancode tecla : m.teclas) {
         if (teclaAtiva(tecla)) {
             return true;
@@ -202,7 +235,7 @@ bool Input::acaoAtiva(Acao acao) const {
 }
 
 bool Input::acaoPressionada(Acao acao) const {
-    const Mapeamento& m = kMapa[static_cast<std::size_t>(acao)];
+    const Mapeamento& m = mapeamento(acao);
     for (SDL_Scancode tecla : m.teclas) {
         if (teclaPressionada(tecla)) {
             return true;
@@ -217,7 +250,7 @@ bool Input::acaoPressionada(Acao acao) const {
 }
 
 bool Input::acaoSolta(Acao acao) const {
-    const Mapeamento& m = kMapa[static_cast<std::size_t>(acao)];
+    const Mapeamento& m = mapeamento(acao);
     for (SDL_Scancode tecla : m.teclas) {
         if (tecla == SDL_SCANCODE_UNKNOWN) {
             continue;

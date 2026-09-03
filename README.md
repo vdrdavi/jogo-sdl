@@ -35,10 +35,30 @@ cada build, então o jogo roda de qualquer diretório; eles já vêm gerados em
 | **Usar o painel** (interior) | **E** | X (botão oeste) |
 | Turbo (voo 3D) | Espaço | A (botão sul) |
 | Confirmar (menu) | Enter ou Espaço | A (botão sul) |
+| Ajustar volume / tela cheia (menu) | ← → | direcional |
 | Voltar ao console / sair | Esc | B / Back |
 | Pausar | Esc ou P | Start |
 | Tela cheia | F11 | — |
 | Menu (na pausa) | M | — |
+
+As preferências — volume, tela cheia e os vínculos de cada ação — são gravadas
+em `config.ini` no diretório de configuração do sistema (`SDL_GetPrefPath`:
+`~/.local/share/jogo-sdl/jogo/` no Linux, `%APPDATA%\jogo-sdl\jogo\` no Windows,
+`~/Library/Application Support/jogo-sdl/jogo/` no macOS). O arquivo nasce na
+primeira execução e é texto `chave=valor`, com um vínculo por linha:
+
+```ini
+volume=0.6
+tela-cheia=0
+
+tecla.interagir.1=E
+botao.interagir.1=x
+```
+
+Como ainda não há tela de remapeamento, editar esse arquivo é o jeito de trocar
+um controle; os nomes são os do SDL (`Left`, `Keypad Enter`, `dpleft`). Citar
+uma ação substitui os vínculos de fábrica dela, e apagar o arquivo restaura
+tudo. Linha estragada é ignorada com um aviso no log.
 
 ## O 3D sem shaders
 

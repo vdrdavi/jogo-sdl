@@ -937,6 +937,163 @@ entre y=255 e y=251 — o agachamento de um pixel lógico (dois de tela, no zoom
 Build limpo do zero nos dois presets, sem nenhum warning, e o teste de fumaça sem
 sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 
+### 2026-09-02 — As preferências sobrevivem ao fechamento (issue #5)
+
+**O pedido:** volume, tela cheia e remapeamento de controles se perdiam ao
+fechar o jogo; `SDL_GetPrefPath()` dá o diretório certo por plataforma para um
+arquivo de configuração.
+
+#### Onde escrever, e por que não é ao lado dos assets
+
+`paths::assetsRoot()` prefere o diretório do executável. Escrever ali seria
+errado por dois motivos independentes: uma instalação de verdade fica em um
+lugar **somente leitura** (`/usr/bin`, `Program Files`), e mesmo quando dá para
+escrever, um arquivo ao lado do binário não acompanha o usuário — dois usuários
+da mesma máquina dividiriam o mesmo volume.
+
+`SDL_GetPrefPath("jogo-sdl", "jogo")` responde a convenção de cada sistema
+(`~/.local/share/…` no Linux, `%APPDATA%` no Windows,
+`~/Library/Application Support/…` no macOS) e **já cria o diretório**. Virou
+`paths::prefRoot()`, irmão de `assetsRoot()`: as duas raízes resolvidas uma vez
+só, com a diferença de que a de preferências é a única em que o jogo escreve.
+
+#### A decisão principal: a configuração não guarda os valores
+
+O caminho óbvio seria uma classe `Config` com `float volume`, `bool telaCheia`,
+uma tabela de teclas — e o jogo lendo dela. O problema aparece na segunda linha:
+o volume **já tem dono**, o `Audio`; a tela cheia já é estado da janela; os
+vínculos já são do `Input`. Uma cópia em `Config` seria um segundo estado, e
+todo lugar que mexe em um teria de lembrar do outro. O primeiro esquecimento é
+um bug silencioso: o jogo faz a coisa certa e salva a errada.
+
+Então [`core/Config.*`](../src/core/Config.hpp) não é uma classe, é um par de
+funções sem estado:
+
+```cpp
+bool carregar(SDL_Window* janela, Audio& audio, Input& input);
+bool salvar(SDL_Window* janela, const Audio& audio, const Input& input);
+```
+
+Carregar é aplicar o arquivo **sobre** os donos; salvar é perguntar a eles. Não
+existe um terceiro lugar para desincronizar.
+
+Uma consequência disso é que o `Input` mudou: a tabela de vínculos era
+`constexpr` no `.cpp` e virou estado do objeto (`mapeamento`,
+`definirMapeamento`, `restaurarPadroes`), semeado com os vínculos de fábrica que
+continuam `constexpr` no mesmo lugar. É o que torna o remapeamento possível —
+sem isso, "remapeamento de controles" não teria o que persistir.
+
+#### O formato: uma linha por vínculo
+
+Texto `chave=valor`, com `#` de comentário — o mesmo tipo de arquivo que
+`conves.mapa` já é. JSON ou binário custariam uma dependência ou um parser, e o
+arquivo **precisa ser editável à mão**: hoje ele é o único jeito de remapear um
+controle, porque não há tela de remapeamento.
+
+A primeira versão punha os vínculos de uma ação em uma linha separada por
+vírgulas. Não funciona: `SDL_GetScancodeName` devolve o nome da tecla, e a
+tecla vírgula se chama `,`. Ponto e vírgula tem o mesmo problema, e espaço
+também (`Left Shift`, `Keypad Enter`). Qualquer separador de um caractere colide
+com alguma tecla. Por isso **cada vínculo tem sua linha, numerada**, e o valor é
+o resto da linha inteiro:
+
+```ini
+volume=0.6
+tela-cheia=0
+
+tecla.interagir.1=E
+botao.interagir.1=x
+```
+
+Os nomes vêm e voltam pelo SDL (`SDL_GetScancodeName` /
+`SDL_GetScancodeFromName`, `SDL_GetGamepadStringForButton` /
+`SDL_GetGamepadButtonFromString`), então o arquivo fala em `Left` e `dpleft`, e
+não em números que ninguém consegue editar.
+
+O arquivo **nasce na primeira execução**, mesmo com tudo no padrão. Um arquivo
+que só aparece depois de a pessoa mexer no volume é um arquivo que ninguém
+encontra — e ele é a interface de remapeamento.
+
+Três detalhes de robustez, porque um arquivo editado à mão erra:
+
+- Chave desconhecida, valor torto, linha sem `=`: loga e segue. O que não for
+  lido fica no padrão. Um `config.ini` estragado não pode derrubar o jogo.
+- **Citar uma ação substitui os vínculos de fábrica dela.** Sem isso, apagar
+  uma linha à mão não teria efeito: o vínculo de fábrica voltaria por baixo.
+- **Mas a substituição só acontece depois que a linha se prova boa.** Na
+  primeira versão, `tecla.cima.1=Teclado Magico` limpava os vínculos de "cima"
+  e *depois* descobria que o nome não existe — resultado: um erro de digitação
+  deixava o jogador sem andar para cima, com um erro no log que ninguém leu.
+  Agora a linha ruim é só ignorada.
+
+#### Quando gravar: nem a cada mudança, nem só no fim
+
+Gravar a cada mudança é o reflexo natural — e no volume ele custa caro: segurar
+a seta muda a preferência **a cada passo fixo**, isto é, 60 reescritas do arquivo
+por segundo para registrar só o último valor. Gravar apenas ao fechar perde tudo
+se o jogo cair.
+
+O `App` guarda uma espera: `marcarConfigSuja()` arma 0,6 s e cada nova mudança
+rearma; quando a espera vence, grava. E o `encerrar()` grava o que ainda estiver
+pendente, porque fechar o jogo não pode ser o jeito de perder a última mudança.
+
+A tela cheia tem uma sutileza própria: quem marca a preferência como suja **não**
+é `alternarTelaCheia()`, e sim os eventos `SDL_EVENT_WINDOW_ENTER_FULLSCREEN` /
+`LEAVE_FULLSCREEN`. O pedido ao SDL pode demorar ou não ser atendido, e o
+gerenciador de janelas pode trocar o modo por conta própria — o evento é o
+único sinal que fala do que **aconteceu**, e não do que foi pedido.
+
+#### Um lugar para mexer no volume
+
+Não adiantaria persistir um volume que ninguém consegue mudar: ele nascia 0,6 no
+`Audio` e ficava lá. A `MenuScene` ganhou duas linhas — `Volume: 60%` e
+`Tela cheia: sim/não` — ajustadas com esquerda/direita, de 5% em 5%. O rótulo
+mostra o valor, então ele deixou de ser constante e virou uma função. O *blip* de
+navegação toca **depois** de aplicar o volume novo, e por isso já sai no volume
+novo: o som é a prévia do ajuste.
+
+O volume passa pelo `App` (`ctx.app.definirVolume`) e não direto pelo `ctx.audio`
+porque é no `App` que a mudança vira arquivo.
+
+#### Verificação
+
+Tudo com `SDL_VIDEODRIVER=dummy`, olhando o arquivo em
+`~/.local/share/jogo-sdl/jogo/config.ini`.
+
+**Nasce sozinho.** Apagado o arquivo, uma execução o recria com os 8 conjuntos
+de vínculos de fábrica, `volume=0.6` e `tela-cheia=0`.
+
+**A ida e a volta.** Editado à mão para `volume=0.25`,
+`tecla.interagir.1=Q`, `tecla.interagir.2=Keypad Enter`, `botao.interagir.1=y`,
+a execução seguinte lê (log `// TEMP`):
+
+```
+TEMP volume=0.250 cheia=0 interagir=[Q|Keypad Enter|] botao=[y]
+```
+
+Note o `Keypad Enter` inteiro: é o caso que derrubaria um separador por espaço.
+
+**O lixo é ignorado, e só ele.** Com cinco linhas erradas acrescentadas de
+propósito:
+
+| Linha | O que o jogo faz |
+|---|---|
+| `volume-total=9` | `config: chave desconhecida "volume-total"` |
+| `tecla.voar.1=Z` | `config: chave desconhecida "tecla.voar.1"` |
+| `tecla.pausar.9=Z` | `config: tecla 9 fora de 1..3 em "pausar"` |
+| `tecla.cima.1=Teclado Magico` | `config: tecla desconhecida "Teclado Magico"` |
+| `linha sem igual` | `config: linha sem '=' ignorada` |
+
+e, na mesma execução, `TEMP cima=[Up|W|]` — a ação da linha com o nome errado
+ficou **intacta**, que é o que a correção do item anterior garante.
+
+**A espera funciona.** Um patch `// TEMP` chamando `definirVolume` em 30 passos
+fixos seguidos (valores de 0,10 a 0,39): o log de gravação aparece **uma única
+vez**, e o arquivo termina com `volume=0.39`. Sem a espera seriam 30 reescritas.
+
+Build limpo do zero nos dois presets, sem nenhum warning, e o teste de fumaça sem
+sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
+
 ## Glossário
 
 | Termo | O que é |
@@ -956,9 +1113,11 @@ sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 | **Delta time** | Tempo real decorrido entre dois quadros. |
 | **Determinístico** | Mesma entrada, mesmo resultado, sempre. |
 | **Diretiva** | Linha `chave valor` de um arquivo de dados, lida como um comando por quem carrega. |
+| **Diretório de preferências** | Onde cada sistema guarda a configuração de um programa, por usuário (`SDL_GetPrefPath`). |
 | **Driver dummy / disk** | Backends do SDL que fingem vídeo/áudio ou gravam o áudio em arquivo. |
 | **Envelope** | Curva que multiplica a amplitude de um som ao longo do tempo (ataque, decaimento). |
 | **Esfera de colisão** | Esfera que substitui a geometria real nos testes de colisão. |
+| **Espera (debounce)** | Adiar uma ação até que as mudanças parem, para não repeti-la a cada instante. |
 | **Espiral da morte** | Quando processar o atraso gera mais atraso do que o quadro consegue absorver. |
 | **Filtro IIR de um polo** | Filtro cuja saída depende da saída anterior; aqui, um passa-baixa de -6 dB/oitava. |
 | **FOV** | Abertura angular da câmera. Maior FOV = mais "grande angular". |
@@ -993,6 +1152,7 @@ sessão gráfica passa. `grep -rn "TEMP" src/` não devolve nada.
 | **Sutherland–Hodgman** | Algoritmo de recorte de polígono contra um plano. |
 | **Teste de fumaça** | Verificação mínima de que o programa sobe e roda. |
 | **Tile** | Peça quadrada com que um cenário 2D é montado. |
+| **Vínculo (binding)** | Ligação entre uma tecla ou botão e uma ação lógica do jogo. |
 | **Vsync** | Sincronizar a apresentação do quadro com a atualização do monitor. |
 | **Winding** | Sentido (horário/anti-horário) em que os vértices de um triângulo são listados. |
 | **Wrap** | Reposicionar por envolvimento: quem sai por um lado entra pelo outro. |

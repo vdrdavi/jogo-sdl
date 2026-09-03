@@ -1,7 +1,6 @@
 #pragma once
 
-#include <array>
-#include <string_view>
+#include <string>
 
 #include "audio/Audio.hpp"
 #include "scene/Scene.hpp"
@@ -9,7 +8,8 @@
 namespace jogo {
 
 /// Menu inicial: navegacao por teclado/gamepad, som nas transicoes e entrada
-/// para a partida.
+/// para a partida. Tambem e onde ficam as preferencias -- volume e tela cheia
+/// --, que o App grava em disco e reencontra na proxima execucao.
 class MenuScene : public Scene {
 public:
     void aoEntrar(Context& ctx) override;
@@ -17,13 +17,15 @@ public:
     void desenhar(Context& ctx, float alpha) override;
 
 private:
-    enum class Opcao { Jogar, TelaCheia, Sair, Contagem };
+    enum class Opcao { Jogar, Volume, TelaCheia, Sair, Contagem };
 
-    static constexpr std::array<std::string_view, 3> kRotulos{
-        "Jogar",
-        "Tela cheia (F11)",
-        "Sair",
-    };
+    /// Passo do volume por toque; 20 toques atravessam a faixa inteira.
+    static constexpr float kPassoVolume = 0.05f;
+
+    /// O rotulo mostra o valor da preferencia, entao nao pode ser constante.
+    static std::string rotulo(const Context& ctx, Opcao opcao);
+    /// Esquerda/direita sobre a opcao selecionada. Devolve true se mudou algo.
+    static bool ajustar(Context& ctx, Opcao opcao, int passo);
 
     int selecao_{0};
     float tempo_{0.0f};

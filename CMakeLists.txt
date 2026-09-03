@@ -22,6 +22,7 @@ find_package(SDL3 3.4 CONFIG REQUIRED)
 add_executable(jogo
     src/main.cpp
     src/core/App.cpp
+    src/core/Config.cpp
     src/core/Paths.cpp
     src/input/Input.cpp
     src/gfx/Animacao.cpp

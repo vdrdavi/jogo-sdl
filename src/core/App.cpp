@@ -48,6 +48,15 @@ bool App::iniciar(const std::string& titulo, int larguraJanela, int alturaJanela
         return false;
     }
 
+    // As preferencias entram depois de todos os subsistemas de pe: elas mexem
+    // no volume do Audio, no modo da janela e no mapa de teclas do Input.
+    // O arquivo nasce ja na primeira execucao, mesmo com tudo no padrao: hoje
+    // ele e o unico jeito de remapear um controle, e um arquivo que so aparece
+    // depois de mexer no volume seria um arquivo que ninguem encontra.
+    if (!config::carregar(janela_.get(), audio_, input_)) {
+        config::salvar(janela_.get(), audio_, input_);
+    }
+
     JOGO_INFO("SDL %d.%d.%d | renderer: %s", SDL_VERSIONNUM_MAJOR(SDL_GetVersion()),
               SDL_VERSIONNUM_MINOR(SDL_GetVersion()), SDL_VERSIONNUM_MICRO(SDL_GetVersion()),
               SDL_GetRendererName(renderer_.get()));
@@ -63,6 +72,29 @@ void App::alternarTelaCheia() {
     if (!SDL_SetWindowFullscreen(janela_.get(), !cheia)) {
         JOGO_ERRO_SDL("SDL_SetWindowFullscreen");
     }
+    // Quem marca a preferencia como suja e o evento de entrada/saida da tela
+    // cheia, nao esta funcao: o pedido pode demorar (ou nem ser atendido) e o
+    // gerenciador de janelas tambem pode trocar o modo por conta propria.
+}
+
+float App::volume() const {
+    return audio_.volume();
+}
+
+void App::definirVolume(float v) {
+    audio_.definirVolume(v);
+    marcarConfigSuja();
+}
+
+void App::salvarConfigSeSuja(float dtReal) {
+    if (esperaConfig_ <= 0.0f) {
+        return;
+    }
+    esperaConfig_ -= dtReal;
+    if (esperaConfig_ <= 0.0f) {
+        esperaConfig_ = 0.0f;
+        config::salvar(janela_.get(), audio_, input_);
+    }
 }
 
 void App::processarEventos(Context& ctx) {
@@ -74,6 +106,10 @@ void App::processarEventos(Context& ctx) {
         switch (evento.type) {
             case SDL_EVENT_QUIT:
                 rodando_ = false;
+                break;
+            case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+            case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+                marcarConfigSuja();
                 break;
             case SDL_EVENT_KEY_DOWN:
                 if (evento.key.scancode == SDL_SCANCODE_F11 && !evento.key.repeat) {
@@ -143,6 +179,7 @@ void App::rodar(ScenePtr cenaInicial) {
             rodando_ = false;
         }
 
+        salvarConfigSeSuja(dtReal);
         atualizarTitulo(dtReal);
     }
 
@@ -151,6 +188,12 @@ void App::rodar(ScenePtr cenaInicial) {
 }
 
 void App::encerrar() {
+    // Uma mudanca dos ultimos instantes ainda pode estar esperando para ser
+    // gravada; fechar o jogo nao pode ser o jeito de perde-la.
+    if (esperaConfig_ > 0.0f && janela_) {
+        esperaConfig_ = 0.0f;
+        config::salvar(janela_.get(), audio_, input_);
+    }
     audio_.encerrar();
     assets_.limpar();
     renderer_.reset();

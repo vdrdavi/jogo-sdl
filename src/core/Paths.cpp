@@ -47,4 +47,31 @@ std::string asset(std::string_view relativo) {
     return caminho;
 }
 
+const std::string& prefRoot() {
+    static const std::string raiz = [] {
+        // O SDL sabe a convencao de cada sistema (~/.local/share no Linux,
+        // %APPDATA% no Windows, ~/Library/Application Support no macOS) e ja
+        // cria o diretorio. A string devolvida e nossa e precisa ser liberada.
+        char* caminho = SDL_GetPrefPath("jogo-sdl", "jogo");
+        if (caminho == nullptr) {
+            JOGO_ERRO_SDL("SDL_GetPrefPath");
+            return std::string{};
+        }
+        std::string resultado{caminho};
+        SDL_free(caminho);
+        return resultado;
+    }();
+    return raiz;
+}
+
+std::string pref(std::string_view relativo) {
+    const std::string& raiz = prefRoot();
+    if (raiz.empty()) {
+        return std::string{};
+    }
+    std::string caminho = raiz;
+    caminho.append(relativo);
+    return caminho;
+}
+
 }  // namespace jogo::paths
