@@ -2,7 +2,9 @@
 
 Você anda pelo interior de uma nave em 2D, usa o painel de pilotagem do convés e
 a tela vira um voo 3D: um caça low poly atravessando um campo de estrelas gerado
-proceduralmente, desviando de asteroides.
+proceduralmente, desviando de asteroides. O mesmo painel também abre o
+diagnóstico do casco, que perde um pedaço a cada rocha — inclusive nas batidas
+que acontecem enquanto você anda lá dentro.
 
 ![Interior da nave: convés de tiles, janelas para o espaço e o painel de pilotagem com o convite para assumir os controles](docs/interior.png)
 
@@ -108,10 +110,11 @@ cmake --preset debug -DCMAKE_PREFIX_PATH="$HOME/sdl3"
 |---|---|---|
 | Andar / pilotar / navegar | WASD ou setas | analógico esquerdo / direcional |
 | **Usar o painel** (interior) | **E** | X (botão oeste) |
+| **Diagnóstico do casco** (no painel) | **Q** | Y (botão norte) |
 | Turbo (voo 3D) | Espaço | A (botão sul) |
 | Confirmar (menu) | Enter ou Espaço | A (botão sul) |
 | Ajustar volume / tela cheia (menu) | ← → | direcional |
-| Voltar ao console / sair | Esc | B / Back |
+| Voltar ao console / fechar o diagnóstico / sair | Esc | B / Back |
 | Pausar | Esc ou P | Start |
 | Tela cheia | F11 | — |
 | Menu (na pausa) | M | — |

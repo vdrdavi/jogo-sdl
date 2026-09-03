@@ -62,6 +62,10 @@ public:
     float fatorTurbo() const;
     /// 1 no instante da batida, decai ate zero. Cada cena sacode do seu jeito.
     float batida() const { return batida_; }
+    /// Integridade do casco em 0..1: comeca inteira e cai a cada batida. Como o
+    /// resto da viagem, e estado do Flight -- a nave leva o estrago batendo com
+    /// o piloto no conves tanto quanto na cabine.
+    float casco() const { return casco_; }
 
     const AsteroidField& rochas() const { return rochas_; }
 
@@ -74,6 +78,7 @@ private:
 
     float velocidade_{kVelocidadeCruzeiro};
     float batida_{0.0f};
+    float casco_{1.0f};
     bool turbo_{false};
 
     float ambiente_{0.0f};

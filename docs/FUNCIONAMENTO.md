@@ -266,7 +266,9 @@ perguntas decidem o que acontece com as cenas de baixo:
 
 A `PauseScene` responde `true` para update e `false` para render: congela a
 partida sem escondê-la. A `FlightScene` responde `true` para os dois: a cabine
-cobre o interior por inteiro.
+cobre o interior por inteiro. A `StatusScene` — o diagnóstico do casco — responde
+como a pausa, mas com uma diferença que a seção 12 explica: bloqueando o update
+do convés, ela **herda a obrigação de dar o passo do voo**, e o faz.
 
 `SceneStack::atualizar` desce do topo até encontrar a primeira cena que bloqueia
 o update; `desenhar` faz o contrário — procura a cena mais alta que preenche a
@@ -327,7 +329,10 @@ Cada ação aceita até três teclas e dois botões; as posições não usadas f
 `UNKNOWN`/`INVALID`, que as consultas ignoram — assim um vínculo pode ser
 removido sem abrir buraco na tabela. **Acrescentar um comando ao jogo é
 acrescentar um valor ao enum, um nome na tabela `kNomes` e uma linha em
-`kPadrao`.**
+`kPadrao`.** Foi só isso que custou o `Q` do diagnóstico do casco
+(`Acao::Diagnostico`, seção 13) — nenhuma cena precisou saber que tecla é essa.
+Como o nome da ação é a chave no arquivo de preferências, a ação nova entra
+**no fim do enum**: os vínculos já gravados continuam valendo.
 
 Essa tabela é o **ponto de partida**, não a palavra final: o mapa em vigor é
 estado do `Input` (`mapa_`), e é justamente por isso que a configuração pode
@@ -862,11 +867,15 @@ O que acontece em um passo:
 Na batida, a nave quase para (18 u/s), a rocha é reposicionada, um som toca e
 `batida_` vai a 1 e decai a 3,4 por segundo. `Flight` não sacode nada: ele expõe
 `batida()` e **cada cena sacode do seu jeito** — o convés inteiro treme na
-`InteriorScene`, a câmera treme na `FlightScene`, e uma cena futura poderia
-apenas piscar um alarme.
+`InteriorScene`, a câmera treme na `FlightScene`, e a `StatusScene` pisca a
+palavra do mostrador.
 
-`Pose` guarda posição e os três ângulos, e o `Flight` mantém a pose anterior para
-`interpolada(alpha)` (seção 2).
+A batida também **cobra o casco**: `casco_` começa em 1, cai 0,125 por rocha e
+para no zero — oito batidas do casco inteiro ao nada. É um valor da *viagem*, e
+por isso mora aqui e não na tela que o mostra: a nave se estraga batendo com o
+piloto no convés tanto quanto na cabine, e o mostrador é só quem lê
+`casco()`. O que acontece com uma nave de casco zerado ainda não é assunto do
+`Flight`: ele grampeia e segue voando.
 
 ### O som que atravessa o casco
 
@@ -906,6 +915,7 @@ baixo, porque a ordem das coisas ali é toda deliberada:
 voo_.atualizar(ctx, dt, Flight::Comando{});    // sempre, antes de qualquer saída
 if (transicao_.ativa()) { ... return; }        // cortina em cena: ninguém comanda nada
 if (acaoPressionada(Pausar)) { ... return; }   // empilha a pausa
+if (pertoDoConsole() && acaoPressionada(Diagnostico)) { ... return; } // empilha o casco
 if (pertoDoConsole() && acaoPressionada(Interagir)) { ... return; }   // fecha a cortina
 moverComColisao(...);                          // só aqui o jogador anda
 camera_.seguir(posicao_, dt, 7.0f);
@@ -927,8 +937,16 @@ if (voo_.batida() > 0.0f) { camera.definirPosicao(/* ...seno... */); }
 
 Somado em `camera_`, o deslocamento realimentaria o seguidor, que perseguiria o
 alvo a partir da posição já sacudida — e o tremor viraria deriva. Em uma cópia,
-ele é só imagem. O convite `[E] Assumir os controles` é ancorado no console mas
-desenhado em coordenadas de tela, com `medir()` dando o tamanho da tarja.
+ele é só imagem. O convite é ancorado no console mas desenhado em coordenadas de
+tela, com `medir()` dando o tamanho da tarja — e são **duas linhas de mesma
+largura**, `[E] Assumir os controles` e `[Q] Diagnostico do casco`, exatamente
+para a tarja sair retangular e as duas opções ficarem centralizadas sobre o
+painel sem cálculo à parte.
+
+As duas opções do painel saem por caminhos diferentes, e a diferença não é
+capricho: o `E` **fecha a cortina** e troca de mundo (a cabine cobre a tela
+inteira); o `Q` empilha um painel que é um *overlay* sobre o próprio convés, que
+continua visível atrás — não há para onde transicionar, então não há cortina.
 
 ### FlightScene
 
@@ -959,6 +977,33 @@ Nascer já nessa distância é começar no regime, não caminhar até ele.
 O FOV também nasce 12° mais fechado e abre sozinho, pela mesma suavização que já
 existia para o turbo: a vista **abre do painel para o espaço** em vez de aparecer
 pronta.
+
+### StatusScene
+
+A outra opção do painel: `Q`, junto ao console, abre o **diagnóstico do casco** —
+uma barra, o número em porcentagem e a palavra do estado (`INTEGRO`, `AVARIADO`,
+`CRITICO`), sobre o convés escurecido. `Esc` ou `Q` de novo fecham.
+
+Ela repete a escolha da `FlightScene` por um motivo parecido: guarda uma
+**referência** para o `Flight` da cena de baixo, bloqueia o update dela e, por
+isso, **passa a ser quem chama `Flight::atualizar`** (com `Comando{}`, o piloto
+automático). Se ela apenas bloqueasse, a viagem congelaria enquanto o painel
+estivesse aberto; chamando, a nave continua voando — e uma rocha derruba o
+mostrador na frente de quem está lendo. Continua valendo o invariante da seção
+12: **um passo de voo por passo fixo**, seja qual for a cena no topo.
+
+O único enfeite com lógica é o **ponteiro**. `ponteiro_` persegue `casco()` com a
+mesma suavização exponencial de sempre, e a barra desenha três coisas: o trilho,
+o casco que restou (na cor da faixa) e, entre ele e o ponteiro que ainda está
+descendo, **o pedaço que a última rocha levou**, em vermelho. Sem isso a barra
+simplesmente teria outro tamanho no quadro seguinte à batida, e ninguém veria o
+que foi perdido. O número segue o ponteiro, e não o casco, para os dois nunca se
+contradizerem no meio da queda.
+
+Um detalhe de acabamento que é dívida da perseguição exponencial: ela chega perto
+e **nunca encosta**, então o ponteiro é encaixado no casco quando a diferença cai
+abaixo de 0,001 — senão sobraria para sempre uma lasca de vermelho de menos de um
+pixel na ponta da barra.
 
 ### PauseScene
 

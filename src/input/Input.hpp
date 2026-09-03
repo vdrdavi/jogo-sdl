@@ -23,6 +23,7 @@ enum class Acao {
     Voltar,
     Pausar,
     Interagir,
+    Diagnostico,
     Contagem,
 };
 

@@ -38,12 +38,16 @@ constexpr std::array<Input::Mapeamento, kNumAcoes> kPadrao{{
     // Interagir
     {{{SDL_SCANCODE_E, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN}},
      {{SDL_GAMEPAD_BUTTON_WEST, SDL_GAMEPAD_BUTTON_INVALID}}},
+    // Diagnostico
+    {{{SDL_SCANCODE_Q, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN}},
+     {{SDL_GAMEPAD_BUTTON_NORTH, SDL_GAMEPAD_BUTTON_INVALID}}},
 }};
 
 /// Nomes das acoes, tambem na ordem do enum.
 constexpr std::array<std::string_view, kNumAcoes> kNomes{
     "esquerda", "direita", "cima",   "baixo",
     "confirmar", "voltar", "pausar", "interagir",
+    "diagnostico",
 };
 
 float normalizarEixo(Sint16 bruto) {

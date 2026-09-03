@@ -37,7 +37,8 @@ src/
 ├─ world/MapaDeTiles.*   grade de tiles lida de um arquivo em assets/maps/
 ├─ audio/Audio.*         WAVs em memória, vozes (e loops) mixados pelo dispositivo
 ├─ scene/                Scene (interface) e SceneStack (transições adiadas)
-└─ scenes/               MenuScene, InteriorScene, FlightScene, PauseScene
+└─ scenes/               MenuScene, InteriorScene, FlightScene, StatusScene,
+                         PauseScene
 ```
 
 Quem é dono de tudo é o `App`: ele cria janela, renderer e subsistemas, e passa

@@ -20,6 +20,10 @@ constexpr float kRaioNave = 2.0f;
 // Batida: a nave quase para e o baque decai por si.
 constexpr float kVelocidadeAposBatida = 18.0f;
 constexpr float kDecaimentoBatida = 3.4f;  // 1/s
+/// Quanto do casco cada rocha leva embora: oito batidas do casco inteiro ao
+/// zero, o bastante para o mostrador do painel andar de forma visivel sem que
+/// uma distracao acabe a viagem.
+constexpr float kDanoPorBatida = 0.125f;
 
 // Ruido do casco: sempre presente, mais forte quando o motor abre.
 constexpr float kAmbienteCruzeiro = 0.45f;
@@ -42,6 +46,7 @@ void Flight::iniciar(Context& ctx, Uint32 semente) {
     velocidade_ = kVelocidadeCruzeiro;
     turbo_ = false;
     batida_ = 0.0f;
+    casco_ = 1.0f;
     abafado_ = true;
 
     rochas_.gerar(semente, kQuantidadeRochas, kRaioCampo);
@@ -115,6 +120,9 @@ void Flight::checarColisao(Context& ctx) {
     ctx.audio.tocar(somImpacto_, abafado_ ? 0.55f : 1.0f);
     velocidade_ = kVelocidadeAposBatida;
     batida_ = 1.0f;
+    // O estrago nao se desfaz: o casco so cai, e para no zero em vez de virar
+    // negativo -- o que acontece com a nave sem casco ainda nao e assunto daqui.
+    casco_ = std::max(0.0f, casco_ - kDanoPorBatida);
 }
 
 }  // namespace jogo

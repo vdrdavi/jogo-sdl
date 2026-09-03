@@ -82,13 +82,14 @@ simulação a 60 Hz, três de cada quatro quadros não chamam `atualizar()`. Se 
 no laço, preserve essa relação.
 
 **O voo não é uma cena.** `Flight` (`src/sim/Flight.*`) guarda pose, velocidade,
-campo de rochas, colisão e o ambiente sonoro, e vive na `InteriorScene` — a nave
-continua voando enquanto o piloto anda lá dentro. Quem chama `Flight::atualizar`
-é a cena ativa: a `FlightScene` com o comando do jogador, a `InteriorScene` com
-`Comando{}` (piloto automático, sem código extra: sem entrada tudo tende a
-seguir reto). Como a `FlightScene` bloqueia o update da de baixo, o voo avança
-**exatamente um passo por passo fixo** nos dois casos — se mexer nisso, confira
-que continua assim. A `FlightScene` guarda uma referência para o `Flight` da
+campo de rochas, colisão, integridade do casco e o ambiente sonoro, e vive na
+`InteriorScene` — a nave continua voando enquanto o piloto anda lá dentro. Quem
+chama `Flight::atualizar` é a cena ativa: a `FlightScene` com o comando do
+jogador, a `InteriorScene` e a `StatusScene` com `Comando{}` (piloto automático,
+sem código extra: sem entrada tudo tende a seguir reto). Toda cena que bloqueia
+o update de quem está embaixo herda a obrigação de dar o passo do voo, e por
+isso ele avança **exatamente um passo por passo fixo** nos três casos — se mexer
+nisso, confira que continua assim. A `FlightScene` guarda uma referência para o `Flight` da
 cena de baixo; isso é seguro porque a pilha só desempilha do topo, então o
 interior sempre sobrevive à cabine.
 

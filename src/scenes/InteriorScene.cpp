@@ -9,6 +9,7 @@
 #include "input/Input.hpp"
 #include "scenes/FlightScene.hpp"
 #include "scenes/PauseScene.hpp"
+#include "scenes/StatusScene.hpp"
 
 namespace jogo {
 namespace {
@@ -175,6 +176,15 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
         return;
     }
 
+    // A outra opcao do painel: ler o casco sem assumir os controles. Aqui nao
+    // ha cortina -- o painel e um overlay sobre o proprio conves, que continua
+    // visivel atras --, entao a StatusScene e empilhada na hora.
+    if (pertoDoConsole() && ctx.input.acaoPressionada(Acao::Diagnostico)) {
+        ctx.audio.tocar(somConfirmar_);
+        ctx.cenas.empilhar(std::make_unique<StatusScene>(voo_));
+        return;
+    }
+
     if (pertoDoConsole() && ctx.input.acaoPressionada(Acao::Interagir)) {
         ctx.audio.tocar(somConfirmar_);
         // A cabine so e empilhada quando a cortina cobrir a tela; ate la, o
@@ -261,7 +271,9 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
 
     // Convite de interacao, ancorado no console e em coordenadas de tela.
     if (pertoDoConsole()) {
-        const char* convite = "[E] Assumir os controles";
+        // Duas linhas de mesma largura: a tarja sai retangular e cada opcao
+        // fica centralizada sobre o painel sem calculo a parte.
+        const char* convite = "[E] Assumir os controles\n[Q] Diagnostico do casco";
         const SDL_FPoint acima =
             camera.mundoParaTela(SDL_FPoint{console_.x + console_.w * 0.5f, console_.y - 6.0f});
         const SDL_FPoint tamanho = ctx.fonte.medir(convite, 1.0f);
@@ -279,8 +291,8 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
 
     // HUD
     const char* dica = ctx.input.temGamepad()
-                           ? "analogico: andar   X: painel   Start: pausar"
-                           : "WASD: andar   E: usar o painel   Esc: pausar";
+                           ? "analogico: andar   X: painel   Y: casco   Start: pausar"
+                           : "WASD: andar   E: painel   Q: casco   Esc: pausar";
     const SDL_FPoint tamanhoDica = ctx.fonte.medir(dica, 1.0f);
     const float meio = static_cast<float>(App::kLarguraLogica) * 0.5f;
     const float yDica = static_cast<float>(App::kAlturaLogica) - 24.0f;
