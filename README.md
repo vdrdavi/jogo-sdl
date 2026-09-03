@@ -10,22 +10,97 @@ proceduralmente, desviando de asteroides.
 
 ## Dependências e build
 
-SDL 3.4 ou mais recente, CMake 3.28+ e um compilador C++20.
-
-```sh
-sudo pacman -S sdl3 cmake ninja     # Arch; em outras distros, o pacote de dev do SDL3
-cmake --preset debug
-cmake --build build/debug
-./build/debug/jogo
-```
+SDL 3.4 ou mais recente, CMake 3.28+, Ninja e um compilador C++20 (GCC, Clang ou
+o MSVC do Visual Studio 2022).
 
 Não há dependência de `SDL3_image`, `SDL3_ttf` ou `SDL3_mixer`: o SDL 3.4 já traz
 PNG e WAV no core (`SDL_LoadPNG`, `SDL_LoadWAV`), o texto usa uma fonte bitmap e
-o áudio mixa vozes com `SDL_AudioStream`.
+o áudio mixa vozes com `SDL_AudioStream`. Então a única coisa que precisa ser
+instalada é o SDL3 — e é só nisso que os três guias abaixo diferem.
+
+Com as dependências no lugar, o build é o mesmo em qualquer sistema:
+
+```sh
+cmake --preset debug
+cmake --build build/debug
+./build/debug/jogo                  # build\debug\jogo.exe no Windows
+```
 
 Há também o preset `release`. Os assets são copiados para junto do executável a
 cada build, então o jogo roda de qualquer diretório; eles já vêm gerados em
 `assets/`, e `tools/gen_assets.py` (Pillow) os regenera.
+
+### Linux
+
+```sh
+sudo pacman -S sdl3 cmake ninja     # Arch; em outras distros, o pacote de dev do SDL3
+```
+
+A 3.4 é recente: distribuições com repositório mais conservador ainda empacotam
+a 3.2, e aí vale [compilar o SDL](#quando-o-sdl-do-sistema-é-mais-velho-que-34).
+
+### Windows
+
+Instale o **Visual Studio 2022** com a carga de trabalho *Desenvolvimento para
+desktop com C++* (traz MSVC, CMake e Ninja) e abra o **x64 Native Tools Command
+Prompt for VS 2022** — os presets usam Ninja, que fora desse prompt não acha o
+compilador.
+
+O caminho mais curto para o SDL3 é o [vcpkg](https://vcpkg.io):
+
+```bat
+git clone https://github.com/microsoft/vcpkg %USERPROFILE%\vcpkg
+%USERPROFILE%\vcpkg\bootstrap-vcpkg.bat
+%USERPROFILE%\vcpkg\vcpkg install sdl3:x64-windows
+cmake --preset debug -DCMAKE_TOOLCHAIN_FILE=%USERPROFILE%/vcpkg/scripts/buildsystems/vcpkg.cmake
+cmake --build build/debug
+```
+
+Alternativa sem vcpkg: baixe o `SDL3-devel-<versão>-VC.zip` das
+[releases oficiais](https://github.com/libsdl-org/SDL/releases), extraia e aponte
+o CMake para a pasta extraída:
+
+```bat
+cmake --preset debug -DCMAKE_PREFIX_PATH=C:/SDL3-3.4.0
+```
+
+Nesse caso, copie a `SDL3.dll` de `lib/x64` para junto de `jogo.exe` antes de
+rodar — o vcpkg faz isso sozinho, o zip não. Se preferir o gerador do Visual
+Studio ao Ninja (para depurar dentro da IDE), troque o preset por
+`cmake -B build/vs -G "Visual Studio 17 2022" -A x64` e informe o mesmo
+`CMAKE_PREFIX_PATH` ou toolchain.
+
+### macOS
+
+```sh
+xcode-select --install              # compilador Clang e ferramentas de linha de comando
+brew install cmake ninja sdl3
+brew info sdl3                      # confira que é 3.4 ou mais recente
+cmake --preset debug -DCMAKE_PREFIX_PATH="$(brew --prefix)"
+cmake --build build/debug
+```
+
+O `CMAKE_PREFIX_PATH` é necessário nos Macs com Apple Silicon: o Homebrew instala
+em `/opt/homebrew`, que não está na lista de lugares que o CMake procura por
+padrão (nos Intel, o `/usr/local` está, e a linha é inofensiva).
+
+### Quando o SDL do sistema é mais velho que 3.4
+
+Compilar o SDL e instalá-lo em um diretório seu funciona nos três sistemas e não
+mexe no que está instalado:
+
+```sh
+git clone --depth 1 --branch release-3.4.0 https://github.com/libsdl-org/SDL
+cmake -S SDL -B SDL/build -DCMAKE_BUILD_TYPE=Release
+cmake --build SDL/build --config Release
+cmake --install SDL/build --prefix "$HOME/sdl3"
+```
+
+Depois é só apontar o build do jogo para esse prefixo:
+
+```sh
+cmake --preset debug -DCMAKE_PREFIX_PATH="$HOME/sdl3"
+```
 
 ## Controles
 
