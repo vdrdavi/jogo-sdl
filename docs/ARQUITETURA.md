@@ -74,6 +74,16 @@ os destroços de fora e termina na `GameOverScene`.
 simulando e aparecendo — é assim que a `PauseScene` congela a partida sem
 escondê-la, e como a `FlightScene` cobre o interior da nave por inteiro.
 
+Um overlay que congela a cena de baixo mas não quer parar o jogo — a
+`DebugScene`, que o F3 abre — devolve a quem congelou o passo dela em piloto
+automático, `Scene::acompanhar()`, por `SceneStack::acompanharAbaixoDoTopo`. É o
+`atualizar` da cena sem nenhuma decisão: o passo do voo, se é ela quem o dá,
+mais o que persegue a simulação (a câmera e o campo de visão da cabine, o campo
+de estrelas, o ponteiro do diagnóstico, o relógio que pulsa a luz de
+emergência). Não ler entrada e não mexer na pilha é o que separa esse passo do
+outro; e **não implementar `acompanhar` também é uma resposta** — é assim que a
+`PauseScene` continua pausando com o painel do F3 aberto por cima.
+
 As transições (`empilhar`, `desempilhar`, `substituir`) são **adiadas para o fim
 do quadro**, então uma cena pode trocar a si mesma com segurança durante o
 próprio `atualizar()` — é exatamente o que a `InteriorScene` faz ao apertar E.

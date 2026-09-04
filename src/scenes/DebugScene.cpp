@@ -92,10 +92,11 @@ private:
     float y_;
 };
 
-/// O voo em curso, procurado do topo da pilha para a base. Quem guarda o Flight
-/// e a InteriorScene (a nave em que se anda e a mesma que voa); a cabine e o
-/// painel do casco so tem referencias para o mesmo objeto, entao achar a
-/// InteriorScene mais alta ja e achar a viagem. nullptr no menu.
+/// O voo em curso, procurado do topo da pilha para a base -- so para ler, que e
+/// tudo que este painel faz com ele. Quem guarda o Flight e a InteriorScene (a
+/// nave em que se anda e a mesma que voa); a cabine e o painel do casco so tem
+/// referencias para o mesmo objeto, entao achar a InteriorScene mais alta ja e
+/// achar a viagem. nullptr no menu.
 Flight* vooNaPilha(SceneStack& cenas) {
     for (std::size_t i = cenas.tamanho(); i-- > 0;) {
         if (auto* interior = dynamic_cast<InteriorScene*>(cenas.em(i))) {
@@ -204,12 +205,12 @@ void DebugScene::aoEntrar(Context& ctx) {
 }
 
 void DebugScene::atualizar(Context& ctx, float dt) {
-    // O passo do voo, que esta tela tomou de quem congelou embaixo dela. Vem
-    // antes de qualquer saida: fechar o painel nao pode custar um passo a
-    // viagem, nem dar um passo a mais.
-    if (voo_ != nullptr) {
-        voo_->atualizar(ctx, dt, Flight::Comando{});
-    }
+    // O passo de quem esta congelado embaixo. Vem antes de qualquer saida:
+    // fechar o painel nao pode custar um passo a viagem, nem dar um passo a
+    // mais. Este painel nao simula nada por conta propria -- quem sabe se o
+    // mundo anda e a cena de baixo: a cabine e o conves seguem voando por
+    // aqui, a pausa continua sendo pausa, e o menu, menu.
+    ctx.cenas.acompanharAbaixoDoTopo(ctx, dt);
 
     // O casco pode ceder com o painel aberto, e aqui nao ha nada a fazer: quem
     // entrega a vista externa e a cena de baixo, olhando Flight::destruida() --

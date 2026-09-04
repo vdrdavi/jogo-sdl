@@ -30,6 +30,18 @@ public:
     /// `alpha` e a fracao do passo ainda nao simulada, para interpolar o desenho.
     virtual void desenhar(Context&, float alpha) = 0;
 
+    /// O passo de uma cena congelada por um overlay que quer deixar o mundo
+    /// andar -- a tela de depuracao, que bloqueia o update sem parar a viagem.
+    /// E o `atualizar` dela em piloto automatico: o passo do voo, se e ela quem
+    /// o da, mais o que **persegue** a simulacao (camera, campo de visao,
+    /// mostradores, o relogio das animacoes). Nao le entrada e nao mexe na
+    /// pilha -- decisoes esperam o painel sair da frente.
+    ///
+    /// Nao implementar isto e dizer que a cena para de verdade quando alguem se
+    /// poe na frente dela: e o que a pausa quer, e o que o menu significa. Por
+    /// isso e cada cena que responde, e nao o overlay que adivinha por ela.
+    virtual void acompanhar(Context&, float /*dt*/) {}
+
     /// false deixa a cena de baixo continuar simulando (HUD sobreposto).
     virtual bool bloqueiaUpdate() const { return true; }
     /// false deixa a cena de baixo aparecer atras (overlay translucido).

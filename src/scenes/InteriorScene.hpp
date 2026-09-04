@@ -28,6 +28,10 @@ public:
     void aoSair(Context& ctx) override;
     void aoRetomar(Context& ctx) override;
     void atualizar(Context& ctx, float dt) override;
+    /// O conves congelado por um painel aberto por cima: a nave continua
+    /// voando, entao o relogio das animacoes -- a luz de emergencia, que anda
+    /// com a sirene -- e a camera continuam com ela.
+    void acompanhar(Context& ctx, float dt) override;
     void desenhar(Context& ctx, float alpha) override;
 
     /// A viagem que esta cena guarda. A cabine e o painel do casco a recebem
@@ -59,6 +63,8 @@ private:
     void aproximarDoConsole(float dt);
     /// Escolhe o clipe pelo que o jogador esta fazendo e anda o temporizador.
     void animarJogador(SDL_FPoint direcao, float dt);
+    /// A camera persegue o jogador, sem sair dos limites do mundo.
+    void enquadrarJogador(float dt);
 
     MapaDeTiles mapa_;
     Camera camera_;

@@ -14,13 +14,15 @@ class SceneStack;
 /// janela, caminhos de arquivo) e o estado da nave.
 ///
 /// E um overlay como a PauseScene: congela quem esta embaixo e deixa a cena
-/// aparecer atras do veu. Por congelar, herda a obrigacao de quem bloqueia o
-/// update -- enquanto esta no topo, e ela quem da o passo do voo, uma vez por
-/// passo fixo e em piloto automatico, para a viagem nao parar (nem andar duas
-/// vezes) so porque alguem abriu o painel.
+/// aparecer atras do veu. Mas, ao contrario da pausa, nao quer parar o mundo:
+/// uma vez por passo fixo devolve a quem congelou o passo dela em piloto
+/// automatico (Scene::acompanhar), para a viagem nao parar nem andar duas vezes
+/// so porque alguem abriu o painel. Quem decide se o mundo anda continua sendo
+/// a cena de baixo -- sobre a pausa, este painel nao ressuscita passo nenhum.
 ///
-/// O voo nao e dela. Ela o encontra na pilha, e pode nao encontrar nenhum: no
-/// menu ainda nao ha viagem, e a secao da nave diz isso.
+/// O voo nao e dela, e ela nao o simula: encontra o Flight na pilha para ler, e
+/// pode nao encontrar nenhum -- no menu ainda nao ha viagem, e a secao da nave
+/// diz isso.
 class DebugScene : public Scene {
 public:
     /// Abre a tela, ou fecha a que ja estiver aberta. E o gancho do F3 no App,

@@ -31,6 +31,10 @@ public:
     void aoSair(Context&) override;
     void atualizar(Context& ctx, float dt) override;
     void desenhar(Context& ctx, float alpha) override;
+    /// Congelada por um painel aberto por cima, a cabine segue dando o passo do
+    /// voo -- sem comando, como a cortina faz -- e a camera, o campo de visao e
+    /// o campo de estrelas seguem alcancando a nave.
+    void acompanhar(Context& ctx, float dt) override;
 
 private:
     static constexpr float kFovBase = 62.0f;
@@ -54,6 +58,10 @@ private:
 
     /// Comeca a sequencia de destruicao: estilhaca a nave e larga os controles.
     void comecarDestruicao();
+    /// Tudo que a vista tem de perseguir depois do passo do voo: a camera, o
+    /// campo de visao, o campo de estrelas, os cacos a deriva e o relogio da
+    /// cena. Sai do passo com comando e do passo automatico igualzinho.
+    void avancarVista(float dt);
 
     /// Camera de terceira pessoa com atraso, guardada nos dois ultimos passos.
     Vec3 camera_{};

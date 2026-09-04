@@ -34,6 +34,21 @@ void SceneStack::atualizar(Context& ctx, float dt) {
     }
 }
 
+void SceneStack::acompanharAbaixoDoTopo(Context& ctx, float dt) {
+    if (pilha_.empty()) {
+        return;
+    }
+    // Mesma regra do update, um degrau abaixo: quem esta no topo ja se
+    // atualizou sozinho, e a varredura para na primeira cena que bloqueia --
+    // as de baixo dela continuam congeladas, desenho e simulacao.
+    for (std::size_t i = pilha_.size() - 1; i-- > 0;) {
+        pilha_[i]->acompanhar(ctx, dt);
+        if (pilha_[i]->bloqueiaUpdate()) {
+            break;
+        }
+    }
+}
+
 void SceneStack::desenhar(Context& ctx, float alpha) {
     if (pilha_.empty()) {
         return;

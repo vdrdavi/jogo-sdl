@@ -23,6 +23,10 @@ public:
 
     void aoEntrar(Context& ctx) override;
     void atualizar(Context& ctx, float dt) override;
+    /// O passo desta cena sem nenhuma decisao: o voo em piloto automatico e o
+    /// ponteiro perseguindo o casco. E o que ela faz por si mesma a cada passo,
+    /// e o que continua fazendo quando um painel a congela por cima.
+    void acompanhar(Context& ctx, float dt) override;
     void desenhar(Context& ctx, float alpha) override;
 
     /// O conves fica visivel atras do painel, como na pausa.

@@ -21,6 +21,11 @@ public:
 
     void aoEvento(Context& ctx, const SDL_Event& evento);
     void atualizar(Context& ctx, float dt);
+    /// A mesma varredura de atualizar(), mas comecando **abaixo do topo** e
+    /// chamando acompanhar(): e como um overlay que congela quem esta embaixo
+    /// e mesmo assim deixa o mundo andar (a tela de depuracao, que segue dando
+    /// o passo do voo) devolve o passo de apresentacao a quem congelou.
+    void acompanharAbaixoDoTopo(Context& ctx, float dt);
     void desenhar(Context& ctx, float alpha);
 
     /// Aplica as transicoes pendentes; chamado pelo App no fim do quadro.

@@ -90,13 +90,15 @@ no laço, preserve essa relação.
 campo de rochas, colisão, integridade do casco e o ambiente sonoro, e vive na
 `InteriorScene` — a nave continua voando enquanto o piloto anda lá dentro. Quem
 chama `Flight::atualizar` é a cena ativa: a `FlightScene` com o comando do
-jogador, a `InteriorScene`, a `StatusScene` e a `DebugScene` com `Comando{}`
-(piloto automático, sem código extra: sem entrada tudo tende a seguir reto).
+jogador, a `InteriorScene` e a `StatusScene` com `Comando{}` (piloto automático,
+sem código extra: sem entrada tudo tende a seguir reto).
 Toda cena que bloqueia o update de quem está embaixo herda a obrigação de dar o
 passo do voo, e por isso ele avança **exatamente um passo por passo fixo** nos
-quatro casos — se mexer nisso, confira que continua assim. A `FlightScene`
-guarda uma referência para o `Flight` da cena de baixo; isso é seguro porque a
-pilha só desempilha do topo, então o interior sempre sobrevive à cabine.
+três casos — se mexer nisso, confira que continua assim. A `DebugScene` é a
+exceção: bloqueia o update e **não** simula nada, devolvendo o passo a quem
+congelou (adiante). A `FlightScene` guarda uma referência para o `Flight` da
+cena de baixo; isso é seguro porque a pilha só desempilha do topo, então o
+interior sempre sobrevive à cabine.
 
 **O fim da nave.** Cada batida tira 0,125 do casco; `Flight::destruida()` é
 `casco() <= 0`, e não um segundo estado a manter em dia. A partir daí o `Flight`
@@ -113,6 +115,20 @@ do quadro, então uma cena pode trocar a si mesma durante o próprio `atualizar(
 simulando e aparecendo (`PauseScene` congela sem esconder; `FlightScene` cobre o
 interior por inteiro). Depois de um `desempilhar`, quem voltou ao topo recebe
 `aoRetomar`.
+
+**Congelar sem parar o mundo se faz pelo `acompanhar`, nunca simulando por
+cima.** `Scene::acompanhar(ctx, dt)` é o `atualizar` da própria cena em piloto
+automático: o passo do voo, se é ela quem o dá, mais o que persegue a simulação
+— câmera e fov da cabine, campo de estrelas, ponteiro do diagnóstico, o relógio
+que pulsa a luz de emergência. Sem entrada e sem mexer na pilha. A `DebugScene`
+só chama `SceneStack::acompanharAbaixoDoTopo` (de cima para baixo, parando na
+primeira que bloqueia) e não toca no `Flight` a não ser para ler. Duas coisas
+saem de graça daí, e as duas já foram bugs: o desenho de quem está embaixo não
+descola do mundo (a cabine ficava para trás da nave, num falso zoom, e o fov
+travava no turbo que o `Comando{}` soltava), e **o F3 aberto sobre a pausa não
+despausa o jogo** — não implementar `acompanhar` é como a `PauseScene` diz que
+para de verdade. Cena nova que dá o passo do voo precisa dá-lo no `acompanhar`
+também, senão a viagem congela quando abrirem o painel em cima dela.
 
 **A passagem convés ↔ cabine é uma cortina, não uma cena.** `Transicao` é
 membro das duas cenas e é desenhada por cima do próprio HUD de cada uma: a saída

@@ -58,17 +58,10 @@ void StatusScene::aoEntrar(Context& ctx) {
 }
 
 void StatusScene::atualizar(Context& ctx, float dt) {
-    tempo_ += dt;
-
     // O passo do voo vem antes da saida, como no conves: fechar o painel nao
-    // pode custar um passo a viagem.
-    voo_.atualizar(ctx, dt, Flight::Comando{});
-    ponteiro_ = aproximar(ponteiro_, voo_.casco(), kTaxaPonteiro, dt);
-    // A perseguicao exponencial chega perto e nunca encosta; sem este encaixe
-    // sobraria para sempre uma lasca de vermelho de menos de um pixel na barra.
-    if (std::fabs(ponteiro_ - voo_.casco()) < 0.001f) {
-        ponteiro_ = voo_.casco();
-    }
+    // pode custar um passo a viagem. E o mesmo passo que esta cena da quando um
+    // painel se abre por cima dela, entao vem de la inteiro.
+    acompanhar(ctx, dt);
 
     // O mostrador chegou a zero: nao ha diagnostico a fazer em uma nave que
     // acabou de se romper. Esta cena se troca pela vista externa -- trocar, e
@@ -87,6 +80,21 @@ void StatusScene::atualizar(Context& ctx, float dt) {
         ctx.input.acaoPressionada(Acao::Diagnostico)) {
         ctx.audio.tocar(somVoltar_);
         ctx.cenas.desempilhar();
+    }
+}
+
+void StatusScene::acompanhar(Context& ctx, float dt) {
+    tempo_ += dt;
+
+    // O diagnostico nao interrompe a viagem: le o casco de uma nave que segue
+    // voando sozinha -- inclusive contra a proxima pedra.
+    voo_.atualizar(ctx, dt, Flight::Comando{});
+
+    ponteiro_ = aproximar(ponteiro_, voo_.casco(), kTaxaPonteiro, dt);
+    // A perseguicao exponencial chega perto e nunca encosta; sem este encaixe
+    // sobraria para sempre uma lasca de vermelho de menos de um pixel na barra.
+    if (std::fabs(ponteiro_ - voo_.casco()) < 0.001f) {
+        ponteiro_ = voo_.casco();
     }
 }
 

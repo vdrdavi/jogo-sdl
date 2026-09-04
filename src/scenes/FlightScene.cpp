@@ -81,8 +81,6 @@ void FlightScene::comecarDestruicao() {
 }
 
 void FlightScene::atualizar(Context& ctx, float dt) {
-    tempo_ += dt;
-
     // O casco zerou: daqui para a frente esta cena so mostra o fim. Vale tanto
     // para quem estava pilotando quanto para quem foi trazido do conves, e a
     // condicao e o estado do voo -- nao um aviso que alguem precise mandar.
@@ -92,7 +90,6 @@ void FlightScene::atualizar(Context& ctx, float dt) {
 
     if (morrendo_) {
         tempoDeMorte_ += dt;
-        destrocos_.atualizar(dt);
         // A cortina so comeca depois de os destrocos correrem: apagar em cima
         // da explosao seria esconder justamente o que ha para ver.
         if (tempoDeMorte_ >= kTempoDestrocos && !transicao_.saindo()) {
@@ -129,6 +126,25 @@ void FlightScene::atualizar(Context& ctx, float dt) {
         comando.turbo = ctx.input.acaoAtiva(Acao::Confirmar);
     }
     voo_.atualizar(ctx, dt, comando);
+    avancarVista(dt);
+}
+
+void FlightScene::acompanhar(Context& ctx, float dt) {
+    // O painel aberto por cima nao tira a nave do espaco: o voo recebe o passo
+    // daqui, em piloto automatico, como receberia da cortina fechando.
+    voo_.atualizar(ctx, dt, Flight::Comando{});
+    avancarVista(dt);
+}
+
+void FlightScene::avancarVista(float dt) {
+    tempo_ += dt;
+
+    // Os cacos correm soltos, sem depender de mais nada: e deriva desenhada, e
+    // por isso avanca aqui junto com a camera que os persegue -- parados com a
+    // vista andando, ficariam para tras no primeiro painel aberto.
+    if (morrendo_) {
+        destrocos_.atualizar(dt);
+    }
 
     fov_ = aproximar(fov_, voo_.turbo() ? kFovTurbo : kFovBase, 4.0f, dt);
 

@@ -274,6 +274,46 @@ do convés, ela **herda a obrigação de dar o passo do voo**, e o faz.
 o update; `desenhar` faz o contrário — procura a cena mais alta que preenche a
 tela e desenha dali para cima, para não gastar tempo com o que está coberto.
 
+### `acompanhar`: o passo de quem foi congelado sem o mundo parar
+
+Congelar a cena de baixo e mesmo assim querer que o mundo ande é uma combinação
+que pede um terceiro gancho. É o caso da `DebugScene`: ela bloqueia o update
+como a pausa, mas abrir o painel do F3 não é interromper a viagem — a nave deve
+continuar voando enquanto se leem os números.
+
+Uma tentação é o painel simular por conta própria: chamar `Flight::atualizar`
+ele mesmo enquanto está no topo. Não funciona por duas razões. A primeira é que
+**quem desenha a nave é a cena congelada**, e o desenho dela não é uma leitura
+direta da simulação: a cabine tem uma câmera que persegue a nave com atraso, um
+campo de visão que abre e fecha com o turbo, um campo de estrelas que precisa
+ser recentralizado; o convés tem o relógio que faz a luz de emergência pulsar;
+o diagnóstico tem um ponteiro que persegue o casco. Com o mundo andando e nada
+disso andando junto, o desenho descola da simulação: a cabine fica para trás da
+nave (que some no fundo, num efeito que parece um zoom), o campo de visão trava
+no turbo que acabou de ser solto, a luz de emergência congela com a sirene
+tocando. A segunda é que o painel **não sabe se o mundo deve andar**: aberto por
+cima da pausa, um passo dado por ele despausa o jogo; aberto sobre a tela de
+fim, faz derivar uma nave que já acabou.
+
+`Scene::acompanhar(ctx, dt)` resolve as duas de uma vez, porque devolve a
+pergunta a quem sabe respondê-la. É o `atualizar` da própria cena **em piloto
+automático**: o passo do voo, se é ela quem o dá, mais tudo que persegue a
+simulação. O que fica de fora é o que depende de alguém no comando — não lê
+entrada e não mexe na pilha; decisões esperam o painel sair da frente. E **não
+implementar `acompanhar` é uma resposta**: é como a `PauseScene` diz que pausa
+mesmo, e o menu, que ali não há mundo nenhum para andar.
+
+Assim, as três cenas que dão o passo do voo (`InteriorScene`, `FlightScene`,
+`StatusScene`) o dão também no `acompanhar` — a `StatusScene` chega a definir o
+`atualizar` como `acompanhar` mais as decisões, que é exatamente o que ele é.
+Quem chama de fora é `SceneStack::acompanharAbaixoDoTopo`, com a mesma regra do
+update: de cima para baixo, parando na primeira cena que bloqueia. Quem estiver
+abaixo *dessa* continua congelada por inteiro, e é o certo — já estava congelada
+antes de o painel abrir.
+
+A `DebugScene`, então, não simula nada: dá um `acompanharAbaixoDoTopo` por passo
+fixo e pronto. O `Flight` que ela procura na pilha é só para ler e mostrar.
+
 ### Por que as transições são adiadas
 
 `empilhar`, `desempilhar` e `substituir` **não** mexem na pilha na hora: elas
@@ -885,9 +925,16 @@ cabine não ter buraco nem repetição. Se mexer nisso, confira que continua ass
 
 Daí sai uma regra que vale para toda cena nova: **quem bloqueia o update de quem
 está embaixo herda a obrigação de dar o passo do voo**. É por isso que a
-`StatusScene` e a `DebugScene` também chamam `Flight::atualizar` com `Comando{}`
-enquanto estão no topo (seção 13) — congelar a tela de baixo não pode congelar a
-viagem, nem fazê-la andar duas vezes no mesmo passo.
+`StatusScene` também chama `Flight::atualizar` com `Comando{}` enquanto está no
+topo — congelar a tela de baixo não pode congelar a viagem, nem fazê-la andar
+duas vezes no mesmo passo.
+
+A `DebugScene` é a exceção que confirma a regra: ela bloqueia o update e **não**
+chama `Flight::atualizar`. Em vez disso devolve o passo a quem congelou, pelo
+`acompanhar` da seção 5, e assim a viagem anda quando a cena de baixo é o convés
+ou a cabine, e continua parada quando é a pausa. São três cenas dando o passo do
+voo, e o total continua sendo **exatamente um por passo fixo** em qualquer
+combinação. Se mexer nisso, confira que continua assim.
 
 O que acontece em um passo:
 
@@ -1214,14 +1261,16 @@ empilha uma nova. Guardar um `bool debugAberta_` no `App` seria uma segunda
 verdade para manter em dia — a mesma razão pela qual `Flight::destruida()` é
 `casco() <= 0` e não um estado à parte.
 
-**Ela congela quem está embaixo, e por isso dá o passo do voo.** É um overlay
-como a `PauseScene`, com `bloqueiaRender()` em `false` — a cena de onde o painel
-foi aberto continua aparecendo, apagada, atrás dele. Mas bloquear o update
-carrega a obrigação da seção 12: enquanto está no topo, é a `DebugScene` que
-chama `Flight::atualizar` com `Comando{}`, uma vez por passo fixo, para a viagem
-não parar nem andar duas vezes. Como ela não é dona de voo nenhum, procura o
-`Flight` percorrendo a pilha de cima para baixo até achar a `InteriorScene` — e
-aceita não achar: no menu ainda não há viagem.
+**Ela congela quem está embaixo, e por isso devolve o passo.** É um overlay como
+a `PauseScene`, com `bloqueiaRender()` em `false` — a cena de onde o painel foi
+aberto continua aparecendo, apagada, atrás dele. Mas ela não quer parar o jogo,
+e por isso chama `SceneStack::acompanharAbaixoDoTopo` uma vez por passo fixo
+(seção 5): a cena congelada dá o próprio passo em piloto automático, incluindo o
+do voo. A `DebugScene` não simula nada — nem sabe se o mundo deve andar, o que é
+justamente o que a deixa correta aberta sobre a pausa, onde nada anda. O
+`Flight` que ela procura na pilha, de cima para baixo até achar a
+`InteriorScene`, é só para ler; e ela aceita não achar, porque no menu ainda não
+há viagem.
 
 Uma consequência boa dessa última decisão: o casco pode ceder com o painel
 aberto, e a `DebugScene` não precisa saber disso. Quem entrega a vista externa é

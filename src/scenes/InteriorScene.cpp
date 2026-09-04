@@ -223,6 +223,31 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
         espelho_ = SDL_FLIP_NONE;
     }
 
+    enquadrarJogador(dt);
+}
+
+void InteriorScene::acompanhar(Context& ctx, float dt) {
+    // O que vale sempre, com painel aberto por cima ou cortina em cena: o passo
+    // do voo -- a nave nao para de voar porque o piloto abriu uma tela -- e o
+    // relogio da cena, que faz a luz de emergencia pulsar e precisa continuar
+    // no compasso da sirene.
+    tempo_ += dt;
+    voo_.atualizar(ctx, dt, Flight::Comando{});
+
+    // Com a cortina em cena, a camera e a animacao andam amarradas a ela -- que
+    // esta congelada junto com o resto desta cena. Adiantar o zoom do painel
+    // aqui o descolaria do fechamento da tela.
+    if (transicao_.ativa()) {
+        return;
+    }
+
+    // Ninguem esta comandando: o jogador esta parado de fato, e a camera so
+    // termina o movimento que ja vinha fazendo.
+    animarJogador(SDL_FPoint{0.0f, 0.0f}, dt);
+    enquadrarJogador(dt);
+}
+
+void InteriorScene::enquadrarJogador(float dt) {
     camera_.seguir(posicao_, dt, 7.0f);
     camera_.limitarA(limitesDoMundo());
 }
