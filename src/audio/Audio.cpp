@@ -21,6 +21,7 @@ bool Audio::iniciar() {
 }
 
 void Audio::encerrar() {
+    suspenso_ = false;
     vozes_.clear();
     sons_.clear();
     porCaminho_.clear();
@@ -167,6 +168,15 @@ void Audio::atualizar() {
                          : static_cast<float>(agora - ultimaAtualizacaoNs_) * 1e-9f;
     ultimaAtualizacaoNs_ = agora;
 
+    // Suspenso, o relogio segue anotado acima (para o dt nao dar um salto do
+    // tamanho da pausa ao voltar), mas nada mais anda: fade parado, carencia
+    // parada, loop sem reabastecer -- o dispositivo nao esta consumindo fluxo
+    // nenhum, entao recolher uma voz aqui jogaria fora um som que ainda nao
+    // tocou.
+    if (suspenso_) {
+        return;
+    }
+
     for (Voz& voz : vozes_) {
         if (voz.encerrando && voz.ganho > 0.0f) {
             voz.ganho = std::max(0.0f, voz.ganho - voz.taxaFade * dt);
@@ -184,6 +194,22 @@ void Audio::atualizar() {
         }
         return voz.fimNs != 0 && agora - voz.fimNs > kCarenciaNs;
     });
+}
+
+void Audio::suspender() {
+    if (!ativo() || suspenso_) {
+        return;
+    }
+    suspenso_ = true;
+    SDL_PauseAudioDevice(dispositivo_);
+}
+
+void Audio::retomar() {
+    if (!ativo() || !suspenso_) {
+        return;
+    }
+    suspenso_ = false;
+    SDL_ResumeAudioDevice(dispositivo_);
 }
 
 void Audio::reabastecer(Voz& voz) {

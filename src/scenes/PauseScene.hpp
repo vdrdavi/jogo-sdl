@@ -6,10 +6,13 @@
 namespace jogo {
 
 /// Overlay de pausa: congela a cena de baixo (bloqueiaUpdate) mas deixa ela
-/// visivel atras (bloqueiaRender == false).
+/// visivel atras (bloqueiaRender == false). Congela tambem o som, suspendendo
+/// o dispositivo enquanto estiver em cena -- nao implementar `acompanhar` para
+/// o mundo mais o silencio sao a mesma frase dita duas vezes.
 class PauseScene : public Scene {
 public:
     void aoEntrar(Context& ctx) override;
+    void aoSair(Context& ctx) override;
     void atualizar(Context& ctx, float dt) override;
     void desenhar(Context& ctx, float alpha) override;
 

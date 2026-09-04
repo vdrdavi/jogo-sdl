@@ -1209,6 +1209,12 @@ O exemplo mais limpo do que a pilha de cenas compra: quatro linhas de lógica,
 de um véu. `M` desempilha duas vezes — sai da pausa e da partida, voltando ao
 menu que ficou na base da pilha.
 
+Ela é a única cena que mexe no dispositivo de áudio: `Audio::suspender()` no
+`aoEntrar`, `Audio::retomar()` no `aoSair`. Congelar a imagem e deixar o
+ambiente do lado de fora tocando seria uma pausa pela metade — o mundo parado
+continuando a fazer barulho. Os detalhes de por que é o dispositivo que para, e
+não o ganho que cai, estão na seção 14.
+
 ### GameOverScene
 
 Uma tela e duas teclas. O que ela tem de interessante é a aritmética da pilha:
@@ -1388,6 +1394,31 @@ poupados, porque são ambientes de cena e não podem sumir sozinhos.
 O fade de saída (`parar(voz, segundos)`) anda em **tempo real**, dentro de
 `Audio::atualizar`, e não no passo fixo: quem pediu o fade em geral já saiu da
 pilha de cenas.
+
+### A pausa cala o som inteiro
+
+Pausar o jogo pausa também todo o som. Quem pede é a `PauseScene`, com
+`Audio::suspender()` no `aoEntrar` e `Audio::retomar()` no `aoSair` — a mesma
+simetria do `bloqueiaUpdate`, e pela mesma razão: enquanto a pausa está em cena,
+nada anda.
+
+**Suspender é parar o dispositivo, não abaixar o volume.** `SDL_PauseAudioDevice`
+faz o dispositivo deixar de puxar dados dos tubos ligados nele; as vozes ficam
+intactas, cada fila exatamente onde estava. Baixar o ganho a zero silenciaria a
+saída, mas o som continuaria correndo por baixo do pano e voltaria adiantado —
+uma pausa de meio minuto devolveria o ambiente meio minuto à frente, e a sirene
+fora do compasso da luz de emergência. Parar as vozes seria pior ainda: o loop
+do ambiente recomeçaria do início a cada pausa.
+
+Enquanto está suspenso, `Audio::atualizar` sai logo depois de anotar o relógio
+(para o `dt` do fade não dar, na volta, um salto do tamanho da pausa) e **não
+faz mais nada**: fade parado, carência parada, loop sem reabastecer. Recolher
+uma voz aqui jogaria fora um som que ainda não tocou — com o dispositivo parado,
+o que está na fila é justamente o que ficou por tocar.
+
+O `back.wav` da própria saída da pausa toca normalmente: ele é pedido no
+`atualizar`, com o dispositivo ainda parado, e a pilha só aplica o `desempilhar`
+(e portanto o `aoSair`, e portanto o `retomar`) no fim do quadro.
 
 ---
 

@@ -9,6 +9,17 @@ namespace jogo {
 
 void PauseScene::aoEntrar(Context& ctx) {
     somVoltar_ = ctx.audio.carregar("audio/back.wav");
+    // Pausado, o mundo para inteiro: o ambiente do lado de fora e a sirene do
+    // casco sao loops que tocariam a pausa toda. Suspender o dispositivo, e nao
+    // parar as vozes, e o que faz o som voltar de onde estava quando a partida
+    // voltar -- inclusive a fase do loop, que nao pode ter emenda.
+    ctx.audio.suspender();
+}
+
+void PauseScene::aoSair(Context& ctx) {
+    // O `back` pedido em atualizar() foi enfileirado com o dispositivo parado; a
+    // pilha so aplica a saida no fim do quadro, entao ele toca aqui, ja no ar.
+    ctx.audio.retomar();
 }
 
 void PauseScene::atualizar(Context& ctx, float dt) {

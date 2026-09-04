@@ -192,6 +192,13 @@ emenda. O WAV do loop também precisa emendar sozinho — `gerar_ambiente` em
 `tools/gen_assets.py` roda o filtro do ruído marrom em círculo justamente para
 isso.
 
+**A pausa cala tudo suspendendo o dispositivo** (`Audio::suspender`, pedido no
+`aoEntrar` da `PauseScene` e desfeito no `aoSair`), e não zerando ganhos nem
+parando vozes: as filas ficam onde estavam, então o ambiente e a sirene retomam
+do ponto exato, sem emenda e sem adiantar. Enquanto suspenso, `Audio::atualizar`
+só anota o relógio e sai — recolher voz com o dispositivo parado descartaria som
+que ainda não tocou.
+
 **A sirene do casco crítico** é outra voz em loop que toca a viagem inteira,
 calada até `casco() <= kCascoCritico`. `Flight::alarme()` é **um número só** que
 abre o ganho dela e acende a luz vermelha da `InteriorScene`: não grave o vaivém

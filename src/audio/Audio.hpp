@@ -48,6 +48,16 @@ public:
     /// Recolhe as vozes que ja terminaram; chamar uma vez por quadro.
     void atualizar();
 
+    /// Cala tudo sem perder nada: o dispositivo para de consumir os fluxos, e as
+    /// vozes ficam exatamente onde estavam -- inclusive a fase do loop do
+    /// ambiente, que retoma sem emenda. E a pausa do jogo (veja PauseScene):
+    /// baixar o volume a zero deixaria o som andar por baixo do pano e voltar
+    /// adiantado. Chamadas repetidas sao no-op.
+    void suspender();
+    /// Devolve o dispositivo ao ar depois de suspender().
+    void retomar();
+    bool suspenso() const { return suspenso_; }
+
     float volume() const { return volume_; }
     void definirVolume(float v);
 
@@ -89,6 +99,7 @@ private:
     VozId proximoId_{1};
     Uint64 ultimaAtualizacaoNs_{0};
     float volume_{0.6f};
+    bool suspenso_{false};
 };
 
 }  // namespace jogo
