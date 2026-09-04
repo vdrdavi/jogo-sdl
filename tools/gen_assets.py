@@ -271,6 +271,39 @@ def gerar_console(largura: int = 48, altura: int = 32) -> None:
     print(f"{destino.name}: {img.width}x{img.height}")
 
 
+def gerar_bancada(largura: int = 48, altura: int = 32) -> None:
+    """Bancada de reparo: e nela que o jogador solda o casco de volta.
+
+    Mesma pegada do console (3x2 tiles, encostada numa parede), mas em metal
+    quente em vez de azul de instrumento: os dois moveis do conves precisam ser
+    reconheciveis de longe, e a cor e o que faz isso antes do formato.
+    """
+    img = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+
+    # painel de ferramentas na parte alta do movel
+    d.rectangle([2, 0, largura - 3, 11], fill=(52, 47, 42), outline=(28, 26, 24))
+    for px in range(7, largura - 6, 7):
+        d.line([px, 2, px, 7], fill=(148, 152, 162))
+        d.point((px, 8), fill=(120, 110, 90))
+
+    # tampo
+    d.rectangle([0, 12, largura - 1, 17], fill=(96, 89, 76), outline=(30, 28, 26))
+    # a chapa presa ao tampo, onde a solda acontece
+    d.rectangle([4, 13, 13, 16], fill=(126, 96, 44), outline=(60, 48, 30))
+
+    # corpo e gavetas
+    d.rectangle([1, 18, largura - 2, altura - 1], fill=(64, 59, 52), outline=(30, 28, 26))
+    for px in (12, 24, 36):
+        d.line([px, 19, px, altura - 2], fill=(44, 41, 37))
+    for gx in (6, 18, 30, 42):
+        d.line([gx - 3, 24, gx + 3, 24], fill=(132, 127, 116))
+
+    destino = ASSETS / "textures" / "bancada.png"
+    img.save(destino)
+    print(f"{destino.name}: {img.width}x{img.height}")
+
+
 def gerar_wav(nome: str, freq: float, duracao: float, forma: str = "quadrada") -> None:
     taxa = 44100
     total = int(taxa * duracao)
@@ -417,12 +450,21 @@ def main() -> None:
     gerar_tiles()
     gerar_interior()
     gerar_console()
+    gerar_bancada()
     gerar_wav("blip.wav", 660.0, 0.07)
     gerar_wav("confirm.wav", 990.0, 0.14)
     gerar_wav("back.wav", 330.0, 0.12)
+    # A solda que nao pegou: mais grave e mais longa que o "voltar", porque na
+    # bancada os dois sons acontecem lado a lado e precisam se distinguir.
+    gerar_wav("falha.wav", 165.0, 0.22)
     gerar_ambiente("espaco.wav")
     gerar_sirene("sirene.wav")
     gerar_impacto("impacto.wav")
+    # A faisca da solda e o mesmo baque com o corte bem mais alto e a cauda bem
+    # mais curta: o ruido sai quase branco, que e o chiado agudo que se espera de
+    # um ponto de solda em vez do estouro grave de uma rocha no casco.
+    gerar_impacto("solda.wav", duracao=0.16, corte=900.0, semente=0x50DA,
+                  decaimento=34.0)
     # O fim da nave: o mesmo baque, mais grave e com uma cauda que dura o
     # tempo de ver os destrocos se afastarem.
     gerar_impacto("destruicao.wav", duracao=2.2, corte=52.0, semente=0xDEAD,

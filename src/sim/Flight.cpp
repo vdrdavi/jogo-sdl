@@ -163,6 +163,17 @@ void Flight::atualizar(Context& ctx, float dt, const Comando& comando) {
     ctx.audio.ajustarGanho(vozSirene_, alarme_ * kGanhoSirene);
 }
 
+void Flight::reparar(float quanto) {
+    // As duas recusas ficam aqui, e nao em quem chama: um casco zerado e o fim
+    // da nave, nao um estado do qual a bancada traga de volta, e o teto do
+    // reparo de campo e propriedade da nave. Assim uma segunda tela que repare
+    // (ou o proximo ponto de solda) nao precisa lembrar das regras.
+    if (!reparavel()) {
+        return;
+    }
+    casco_ = std::min(kCascoReparado, casco_ + quanto);
+}
+
 void Flight::checarColisao(Context& ctx) {
     const int atingida = rochas_.colisao(pose_.posicao, kRaioNave);
     if (atingida < 0) {

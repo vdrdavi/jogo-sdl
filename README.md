@@ -4,8 +4,10 @@ Você anda pelo interior de uma nave em 2D, usa o painel de pilotagem do convés
 a tela vira um voo 3D: um caça low poly atravessando um campo de estrelas gerado
 proceduralmente, desviando de asteroides. O mesmo painel também abre o
 diagnóstico do casco, que perde um pedaço a cada rocha — inclusive nas batidas
-que acontecem enquanto você anda lá dentro. No fim do casco a nave passa a
-avisar: a sirene toca e o convés pisca em vermelho. Quando o casco acaba, a nave
+que acontecem enquanto você anda lá dentro. No canto oposto do convés há uma
+bancada onde se solda o casco de volta, um ponto de cada vez, enquanto a nave
+segue voando sozinha lá fora. No fim do casco a nave passa a avisar: a sirene
+toca e o convés pisca em vermelho. Quando o casco acaba, a nave
 se despedaça na vista externa e a viagem termina ali.
 
 ![Interior da nave: convés de tiles, janelas para o espaço e o painel de pilotagem com o convite para assumir os controles](docs/interior.png)
@@ -111,12 +113,13 @@ cmake --preset debug -DCMAKE_PREFIX_PATH="$HOME/sdl3"
 | Ação | Teclado | Gamepad |
 |---|---|---|
 | Andar / pilotar / navegar | WASD ou setas | analógico esquerdo / direcional |
-| **Usar o painel** (interior) | **E** | X (botão oeste) |
+| **Usar o painel / a bancada** (interior) | **E** | X (botão oeste) |
 | **Diagnóstico do casco** (no painel) | **Q** | Y (botão norte) |
+| **Soldar** (na bancada) | Espaço ou Enter | A (botão sul) |
 | Turbo (voo 3D) | Espaço | A (botão sul) |
 | Confirmar (menu) | Enter ou Espaço | A (botão sul) |
 | Ajustar volume / tela cheia (menu) | ← → | direcional |
-| Voltar ao console / fechar o diagnóstico / sair | Esc | B / Back |
+| Voltar ao console / fechar o diagnóstico ou a bancada / sair | Esc | B / Back |
 | Pausar | Esc ou P | Start |
 | Tela cheia | F11 | — |
 | Menu (na pausa) | M | — |
@@ -194,14 +197,15 @@ automático e pode bater, e aí o convés inteiro sacode.
 
 O interior da nave não é gerado em código: `assets/maps/conves.mapa` é um arquivo
 de texto com a legenda de caracteres, marcadores nomeados e a grade desenhada
-caractere a caractere. Editar o cenário — mover o painel de pilotagem, abrir uma
-janela, mudar o tamanho do convés — é editar esse arquivo e rodar de novo, sem
-recompilar.
+caractere a caractere. Editar o cenário — mover o painel de pilotagem ou a
+bancada de reparo, abrir uma janela, mudar o tamanho do convés — é editar esse
+arquivo e rodar de novo, sem recompilar.
 
 ```
 legenda . piso
 legenda # parede
 marcador console 8.5 2
+marcador bancada 1.5 10
 mapa
 ####################
 #-ooooo------ooooo-#

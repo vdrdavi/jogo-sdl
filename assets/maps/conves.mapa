@@ -24,6 +24,10 @@ legenda o janela
 # meio-tile centra o painel nos 20 tiles de largura do conves.
 marcador console 8.5 2
 
+# Canto superior esquerdo da bancada de reparo, encostada na parede de baixo,
+# no extremo oposto ao painel: atravessar o conves para soldar e parte do preco.
+marcador bancada 1.5 10
+
 mapa
 ####################
 #-ooooo------ooooo-#

@@ -44,6 +44,7 @@ add_executable(jogo
     src/scenes/FlightScene.cpp
     src/scenes/PauseScene.cpp
     src/scenes/StatusScene.cpp
+    src/scenes/RepairScene.cpp
     src/scenes/GameOverScene.cpp
     src/scenes/Transicao.cpp
 )

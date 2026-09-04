@@ -303,9 +303,10 @@ entrada e não mexe na pilha; decisões esperam o painel sair da frente. E **nã
 implementar `acompanhar` é uma resposta**: é como a `PauseScene` diz que pausa
 mesmo, e o menu, que ali não há mundo nenhum para andar.
 
-Assim, as três cenas que dão o passo do voo (`InteriorScene`, `FlightScene`,
-`StatusScene`) o dão também no `acompanhar` — a `StatusScene` chega a definir o
-`atualizar` como `acompanhar` mais as decisões, que é exatamente o que ele é.
+Assim, as quatro cenas que dão o passo do voo (`InteriorScene`, `FlightScene`,
+`StatusScene`, `RepairScene`) o dão também no `acompanhar` — a `StatusScene` e a
+`RepairScene` chegam a definir o `atualizar` como `acompanhar` mais as decisões,
+que é exatamente o que ele é.
 Quem chama de fora é `SceneStack::acompanharAbaixoDoTopo`, com a mesma regra do
 update: de cima para baixo, parando na primeira cena que bloqueia. Quem estiver
 abaixo *dessa* continua congelada por inteiro, e é o certo — já estava congelada
@@ -666,6 +667,16 @@ Editar o cenário não exige recompilar, e cabe mais de um ambiente no jogo. O
 marcador aceita fração porque o painel tem 3 tiles de largura e o convés tem 20:
 `8.5` é o que centraliza o console de verdade.
 
+Hoje o arquivo traz **dois** marcadores, e eles são os dois móveis do convés: o
+`console` de pilotagem, encostado na parede de cima, e a `bancada` de reparo, no
+canto oposto, encostada na parede de baixo. Os dois são sólidos (a colisão de
+`moverComColisao` recusa a caixa do jogador que os sobrepõe), os dois têm uma
+**zona de interação** logo à frente e os dois respondem a `E` — o que muda é de
+que lado se chega. À bancada se chega por cima, então a zona dela fica *acima*
+do móvel, e não abaixo como a do console. Que a bancada fique longe do painel é
+escolha de desenho de jogo, não acaso: atravessar o convés para soldar é parte
+do preço do reparo (seção 13).
+
 **O que ficou de fora do arquivo, de propósito**: quais nomes de tile existem,
 qual é o índice de cada um no atlas e quais são sólidos. Isso vive na tabela
 `kDefinicoes` no topo de `MapaDeTiles.cpp`, porque descreve a **textura e a
@@ -967,6 +978,22 @@ para no zero — oito batidas do casco inteiro ao nada. É um valor da *viagem*,
 por isso mora aqui e não na tela que o mostra: a nave se estraga batendo com o
 piloto no convés tanto quanto na cabine, e o mostrador é só quem lê `casco()`.
 
+### O casco volta, até certo ponto
+
+O estrago não é só de mão única: a bancada do convés **devolve** casco, por
+`Flight::reparar(quanto)`. As duas regras que cercam isso ficam no `Flight`, e
+não na tela que solda:
+
+- **uma nave perdida não se conserta.** Casco zerado é o fim, não um estado do
+  qual se volte;
+- **o reparo de campo não deixa a nave nova.** `kCascoReparado` (0,75) é o teto:
+  acima dele o estrago é de estaleiro. Sem esse teto, uma bancada paciente
+  apagaria o risco do jogo inteiro — quem solda compra fôlego, não um casco novo.
+
+Ficando aqui, a próxima tela que repare (ou o próximo ponto de solda) não precisa
+lembrar de nenhuma das duas. `reparavel()` é a pergunta que a cena faz antes de
+mostrar um alvo em que valha apertar.
+
 ### Quando o casco zera
 
 Não há um segundo estado para manter em dia: `destruida()` **é** `casco() <= 0`.
@@ -1067,6 +1094,7 @@ if (transicao_.ativa()) { ... return; }        // cortina em cena: ninguém coma
 if (voo_.destruida()) { ... return; }          // entrega a vista externa
 if (acaoPressionada(Pausar)) { ... return; }   // empilha a pausa
 if (pertoDoConsole() && acaoPressionada(Diagnostico)) { ... return; } // empilha o casco
+if (pertoDaBancada() && acaoPressionada(Interagir)) { ... return; }   // empilha o reparo
 if (pertoDoConsole() && acaoPressionada(Interagir)) { ... return; }   // fecha a cortina
 moverComColisao(...);                          // só aqui o jogador anda
 camera_.seguir(posicao_, dt, 7.0f);
@@ -1113,6 +1141,12 @@ As duas opções do painel saem por caminhos diferentes, e a diferença não é
 capricho: o `E` **fecha a cortina** e troca de mundo (a cabine cobre a tela
 inteira); o `Q` empilha um painel que é um *overlay* sobre o próprio convés, que
 continua visível atrás — não há para onde transicionar, então não há cortina.
+
+A **bancada** é a segunda parada do convés e usa o mesmo `E`, sem conflito, porque
+as duas zonas de interação não se cruzam: perto do painel o `E` pilota, perto da
+bancada ele solda. Ela segue o caminho do `Q` — *overlay* sem cortina, porque o
+piloto não sai do convés — e o convite dela sai da mesma `desenharConvite`, que
+existe justamente para as duas bocas do convés não parecerem coisas diferentes.
 
 ### FlightScene
 
@@ -1201,6 +1235,47 @@ pela `FlightScene` (`substituir`, não `empilhar`). Trocar é o que deixa a pilh
 idêntica à dos outros caminhos até o fim — `MenuScene ▸ InteriorScene ▸
 FlightScene` —, e é por isso que a `GameOverScene` pode desempilhar sempre os
 mesmos dois degraus para voltar ao menu.
+
+### RepairScene
+
+A bancada do convés, aberta com `E` no canto oposto ao painel: um **compasso de
+solda**. Um ponteiro varre uma barra de ponta a ponta e o jogador aperta
+`Confirmar` dentro da zona marcada. Cada acerto devolve 0,035 de casco, **encolhe
+a zona** (×0,84) e **acelera o ponteiro** (×1,11) — a série fica mais difícil
+justamente porque está indo bem, e quem decide quando descer da bancada é o
+jogador, não um cronômetro. Errar não custa casco: custa a *solda fria*, meio
+segundo de ponteiro parado, e devolve a série ao começo.
+
+O que faz disso uma decisão, e não um passatempo, é a arquitetura em volta. Como
+a `FlightScene` e a `StatusScene`, ela guarda uma referência para o `Flight` da
+`InteriorScene`, bloqueia o update de baixo e **passa a ser quem chama
+`Flight::atualizar`** com `Comando{}` — um passo por passo fixo, o invariante da
+seção 12. Enquanto se solda, **ninguém está vendo o campo de rochas**. A rocha
+que chegar cobra 0,125 do casco, mais do que três acertos devolvem, e ainda
+desmancha a série em andamento: o preço do erro e o preço da pedra são o mesmo de
+propósito. É por isso que a punição do minigame pode ser tão branda — a punição
+de verdade já está do lado de fora, e o único recurso que a bancada gasta é
+tempo.
+
+Três detalhes que não são enfeite:
+
+- **O ponteiro anda no passo fixo e o desenho interpola** com `alpha`
+  (`ponteiroAnterior_`), como a pose da nave. Sem isso a agulha andaria aos
+  saltos de 60 Hz em uma tela que desenha a 240.
+- **A zona nova nunca nasce debaixo do ponteiro.** O sorteio se repete até cair a
+  mais de 0,25 da agulha; caindo em cima, seria um acerto de graça e a série
+  deixaria de medir alguma coisa.
+- **O `acompanhar` desta cena não move o ponteiro.** Ele dá o passo do voo, anda
+  o relógio da tela e reage à batida — o mundo —, mas a varredura é a mão do
+  jogador, não algo que persegue a simulação (seção 5). Um painel aberto por cima
+  não pode gastar a série de quem ficou sem poder apertar nada. A reação à
+  batida, essa, fica no `acompanhar`: a rocha bateu, e a solda se perde tenha ou
+  não alguém olhando.
+
+Como a `StatusScene`, ela não bloqueia o render — o convés fica visível atrás,
+**inclusive a luz vermelha do casco crítico**, que é metade da graça de estar ali
+— e, se o casco ceder durante a solda, ela **se troca** pela `FlightScene` pelo
+mesmo motivo aritmético descrito acima.
 
 ### PauseScene
 
@@ -1465,8 +1540,8 @@ de um script Python (com Pillow) que qualquer pessoa pode rodar e ajustar.
 python tools/gen_assets.py
 ```
 
-Ele gera as texturas (tiles do interior, personagem, console), o atlas da fonte
-e os WAVs. Dois deles merecem explicação.
+Ele gera as texturas (tiles do interior, personagem, console, bancada), o atlas
+da fonte e os WAVs. Dois deles merecem explicação.
 
 **O ambiente (`espaco.wav`) é ruído marrom.** *Ruído branco* tem energia igual em
 todas as frequências e soa como chiado de televisão; o **ruído marrom** cai a
@@ -1483,6 +1558,12 @@ no `Flight` (seção 12). Como todo *loop*, ele precisa emendar consigo mesmo, e
 aqui isso é uma conta e não um filtro: cada parcial tem que fechar um número
 inteiro de ciclos na duração do arquivo. O gerador confere isso e recusa uma
 combinação que não feche, em vez de gravar um WAV que estala a cada volta.
+
+**A faísca da solda (`solda.wav`) é o baque com outros dois números.** Mesmo
+gerador do impacto no casco, com a frequência de corte muito mais alta (o ruído
+sai quase branco, agudo, em vez de grave) e a cauda muito mais curta. Vale
+registrar porque é o que o gerador tem de melhor: um som novo costuma ser um
+parâmetro diferente em uma função que já existe, não uma função nova.
 
 **A fonte não depende do sistema.** `assets/fonts/unscii-16.ttf` está em domínio
 público e acompanha o repositório justamente para que gerar o atlas não dependa

@@ -59,12 +59,19 @@ private:
     SDL_FRect caixaDoJogador(SDL_FPoint centro) const;
     SDL_FRect limitesDoMundo() const;
     bool pertoDoConsole() const;
+    bool pertoDaBancada() const;
     /// Inclina a camera sobre o painel na mesma medida em que a cortina fecha.
     void aproximarDoConsole(float dt);
     /// Escolhe o clipe pelo que o jogador esta fazendo e anda o temporizador.
     void animarJogador(SDL_FPoint direcao, float dt);
     /// A camera persegue o jogador, sem sair dos limites do mundo.
     void enquadrarJogador(float dt);
+    /// A tarja de convite que flutua sobre um movel do conves, ancorada nele em
+    /// coordenadas de tela. Console e bancada usam a mesma, com textos
+    /// diferentes: sao duas bocas do mesmo painel, e desenhar cada uma do seu
+    /// jeito so faria a segunda parecer outra coisa.
+    void desenharConvite(Context& ctx, const Camera& camera, const char* texto,
+                         const SDL_FRect& movel) const;
 
     MapaDeTiles mapa_;
     Camera camera_;
@@ -84,9 +91,16 @@ private:
     SDL_FRect console_{0.0f, 0.0f, 48.0f, 32.0f};
     SDL_FRect zonaDoConsole_{0.0f, 0.0f, 0.0f, 0.0f};
 
+    /// A bancada de reparo, no canto oposto ao painel de pilotagem: e preciso
+    /// atravessar o conves para soldar, e a viagem corre nos dois sentidos.
+    /// Aqui se chega por cima, entao a zona de interacao fica acima dela.
+    SDL_FRect bancada_{0.0f, 0.0f, 48.0f, 32.0f};
+    SDL_FRect zonaDaBancada_{0.0f, 0.0f, 0.0f, 0.0f};
+
     Sprite jogador_;
     Animacao animacaoJogador_;
     Sprite consoleSprite_;
+    Sprite bancadaSprite_;
     SDL_Texture* tiles_{nullptr};
     Audio::SomId somConfirmar_{0};
 };

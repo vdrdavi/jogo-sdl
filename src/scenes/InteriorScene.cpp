@@ -9,6 +9,7 @@
 #include "input/Input.hpp"
 #include "scenes/FlightScene.hpp"
 #include "scenes/PauseScene.hpp"
+#include "scenes/RepairScene.hpp"
 #include "scenes/StatusScene.hpp"
 
 namespace jogo {
@@ -53,7 +54,7 @@ void InteriorScene::moverComColisao(SDL_FPoint deslocamento) {
         const SDL_FPoint candidato{posicao_.x + dx, posicao_.y + dy};
         const SDL_FRect caixa = caixaDoJogador(candidato);
 
-        if (sobrepoe(caixa, console_)) {
+        if (sobrepoe(caixa, console_) || sobrepoe(caixa, bancada_)) {
             return;
         }
 
@@ -80,6 +81,10 @@ bool InteriorScene::pertoDoConsole() const {
     return sobrepoe(caixaDoJogador(posicao_), zonaDoConsole_);
 }
 
+bool InteriorScene::pertoDaBancada() const {
+    return sobrepoe(caixaDoJogador(posicao_), zonaDaBancada_);
+}
+
 void InteriorScene::aoEntrar(Context& ctx) {
     // O conves vem de assets/maps/conves.mapa; se o arquivo faltar ou estiver
     // torto, o MapaDeTiles loga e entrega uma sala fechada no lugar.
@@ -96,6 +101,10 @@ void InteriorScene::aoEntrar(Context& ctx) {
     consoleSprite_.tamanho = SDL_FPoint{48.0f, 32.0f};
     consoleSprite_.ancora = SDL_FPoint{0.0f, 0.0f};
 
+    bancadaSprite_.textura = ctx.assets.textura("textures/bancada.png");
+    bancadaSprite_.tamanho = SDL_FPoint{48.0f, 32.0f};
+    bancadaSprite_.ancora = SDL_FPoint{0.0f, 0.0f};
+
     somConfirmar_ = ctx.audio.carregar("audio/confirm.wav");
 
     const SDL_FRect mundo = limitesDoMundo();
@@ -109,6 +118,17 @@ void InteriorScene::aoEntrar(Context& ctx) {
     // Zona de interacao: logo a frente do painel.
     zonaDoConsole_ = SDL_FRect{console_.x - 10.0f, console_.y + console_.h, console_.w + 20.0f,
                                26.0f};
+
+    // A bancada de reparo, do outro lado do conves. Como o painel, quem decide
+    // onde ela fica e o mapa; sem o marcador, o canto inferior esquerdo.
+    SDL_FPoint cantoDaBancada{static_cast<float>(kTile),
+                              mundo.h - bancadaSprite_.tamanho.y - static_cast<float>(kTile)};
+    mapa_.marcador("bancada", cantoDaBancada);
+    bancada_ = SDL_FRect{cantoDaBancada.x, cantoDaBancada.y, bancadaSprite_.tamanho.x,
+                         bancadaSprite_.tamanho.y};
+    // Encostada na parede de baixo, a bancada so tem um lado por onde chegar:
+    // a zona fica acima dela, e nao abaixo como a do painel.
+    zonaDaBancada_ = SDL_FRect{bancada_.x - 10.0f, bancada_.y - 26.0f, bancada_.w + 20.0f, 26.0f};
 
     // Nasce de frente para o painel: o convite [E] aparece de cara.
     posicao_ = SDL_FPoint{console_.x + console_.w * 0.5f, console_.y + console_.h + 14.0f};
@@ -203,6 +223,14 @@ void InteriorScene::atualizar(Context& ctx, float dt) {
         return;
     }
 
+    // A bancada e a outra parada do conves. Como o diagnostico, e um overlay
+    // sobre o proprio conves -- nao ha cortina, porque o piloto nao sai de la.
+    if (pertoDaBancada() && ctx.input.acaoPressionada(Acao::Interagir)) {
+        ctx.audio.tocar(somConfirmar_);
+        ctx.cenas.empilhar(std::make_unique<RepairScene>(voo_));
+        return;
+    }
+
     if (pertoDoConsole() && ctx.input.acaoPressionada(Acao::Interagir)) {
         ctx.audio.tocar(somConfirmar_);
         // A cabine so e empilhada quando a cortina cobrir a tela; ate la, o
@@ -252,6 +280,25 @@ void InteriorScene::enquadrarJogador(float dt) {
     camera_.limitarA(limitesDoMundo());
 }
 
+void InteriorScene::desenharConvite(Context& ctx, const Camera& camera, const char* texto,
+                                   const SDL_FRect& movel) const {
+    // Linhas de mesma largura: a tarja sai retangular e cada opcao fica
+    // centralizada sobre o movel sem calculo a parte.
+    const SDL_FPoint acima =
+        camera.mundoParaTela(SDL_FPoint{movel.x + movel.w * 0.5f, movel.y - 6.0f});
+    const SDL_FPoint tamanho = ctx.fonte.medir(texto, 1.0f);
+    const float subida = std::sin(tempo_ * 4.0f) * 1.5f;
+
+    draw::retanguloTela(ctx.renderer,
+                        SDL_FRect{acima.x - tamanho.x * 0.5f - 6.0f,
+                                  acima.y - tamanho.y - 4.0f + subida, tamanho.x + 12.0f,
+                                  tamanho.y + 6.0f},
+                        SDL_Color{10, 14, 24, 200});
+    ctx.fonte.desenharCentralizado(ctx.renderer, texto, acima.x,
+                                   acima.y - tamanho.y - 1.0f + subida,
+                                   SDL_Color{150, 230, 255, 255}, 1.0f);
+}
+
 void InteriorScene::desenhar(Context& ctx, float alpha) {
     // Tremor da batida: a nave levou o tranco e o convés inteiro sacode. A
     // sacudida entra so aqui, numa copia da camera, para nao realimentar o
@@ -299,6 +346,15 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
                          SDL_FRect{console_.x + 2.0f, console_.y + 8.0f, console_.w - 4.0f, 14.0f},
                          SDL_Color{90, 190, 240, static_cast<Uint8>(24.0f + pulso * 34.0f)});
 
+    // Bancada de reparo, com o ponto de solda respirando no tampo -- mais lento
+    // e mais quente que as telas do painel, para os dois moveis nao piscarem
+    // como se fossem o mesmo aparelho.
+    draw::sprite(ctx.renderer, camera, bancadaSprite_, SDL_FPoint{bancada_.x, bancada_.y});
+    const float brasa = 0.5f + 0.5f * std::sin(tempo_ * 1.4f + 1.1f);
+    draw::retanguloMundo(ctx.renderer, camera,
+                         SDL_FRect{bancada_.x + 4.0f, bancada_.y + 13.0f, 10.0f, 4.0f},
+                         SDL_Color{250, 190, 90, static_cast<Uint8>(20.0f + brasa * 60.0f)});
+
     // Jogador
     const SDL_FPoint desenhada = interpolar(posicaoAnterior_, posicao_, alpha);
     draw::retanguloMundo(ctx.renderer, camera,
@@ -326,24 +382,13 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
                             luz);
     }
 
-    // Convite de interacao, ancorado no console e em coordenadas de tela.
+    // Convite de interacao. As duas zonas nao se cruzam, entao o `else` e so
+    // para deixar dito que ha um convite de cada vez na tela.
     if (pertoDoConsole()) {
-        // Duas linhas de mesma largura: a tarja sai retangular e cada opcao
-        // fica centralizada sobre o painel sem calculo a parte.
-        const char* convite = "[E] Assumir os controles\n[Q] Diagnostico do casco";
-        const SDL_FPoint acima =
-            camera.mundoParaTela(SDL_FPoint{console_.x + console_.w * 0.5f, console_.y - 6.0f});
-        const SDL_FPoint tamanho = ctx.fonte.medir(convite, 1.0f);
-        const float subida = std::sin(tempo_ * 4.0f) * 1.5f;
-
-        draw::retanguloTela(ctx.renderer,
-                            SDL_FRect{acima.x - tamanho.x * 0.5f - 6.0f,
-                                      acima.y - tamanho.y - 4.0f + subida, tamanho.x + 12.0f,
-                                      tamanho.y + 6.0f},
-                            SDL_Color{10, 14, 24, 200});
-        ctx.fonte.desenharCentralizado(ctx.renderer, convite, acima.x,
-                                       acima.y - tamanho.y - 1.0f + subida,
-                                       SDL_Color{150, 230, 255, 255}, 1.0f);
+        desenharConvite(ctx, camera, "[E] Assumir os controles\n[Q] Diagnostico do casco",
+                        console_);
+    } else if (pertoDaBancada()) {
+        desenharConvite(ctx, camera, "[E] Soldar o casco", bancada_);
     }
 
     // HUD

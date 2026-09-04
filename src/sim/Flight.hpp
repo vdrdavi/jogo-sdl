@@ -40,6 +40,13 @@ public:
     static constexpr float kVelocidadeCruzeiro = 62.0f;
     static constexpr float kVelocidadeTurbo = 185.0f;
 
+    /// Ate onde a bancada do conves leva o casco de volta. O reparo de campo
+    /// nao deixa a nave nova: acima disto o estrago e de estaleiro, e a viagem
+    /// segue com a marca das rochas que ja passaram. E o que impede a bancada
+    /// de apagar o risco do jogo -- quem repara compra folego, nao um casco
+    /// novo.
+    static constexpr float kCascoReparado = 0.75f;
+
     /// Ate aqui o casco esta em estado critico. A fronteira e uma so para o
     /// alarme, a luz de emergencia e a palavra do diagnostico nunca se
     /// contradizerem -- a sirene nao pode tocar sobre um mostrador que ainda
@@ -55,6 +62,14 @@ public:
 
     /// Liga enquanto o jogador estiver no interior: o casco abafa o lado de fora.
     void definirAbafado(bool abafado) { abafado_ = abafado; }
+
+    /// Devolve casco, ate o teto do reparo de campo. Quem chama e a bancada do
+    /// conves, um ponto de solda por vez; o teto e a recusa de reparar uma nave
+    /// ja perdida ficam aqui, e nao na cena, porque sao regras da nave.
+    void reparar(float quanto);
+    /// Ha o que a bancada possa fazer? Uma nave perdida nao se conserta, e um
+    /// casco acima do teto ja esta no melhor que o reparo de campo alcanca.
+    bool reparavel() const { return !destruida() && casco_ < kCascoReparado; }
 
 #ifdef JOGO_DEBUG
     /// A trapaca de quem desenvolve, que o F4 liga e desliga (so na build de

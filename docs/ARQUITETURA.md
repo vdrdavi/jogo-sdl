@@ -39,7 +39,8 @@ src/
 ├─ audio/Audio.*         WAVs em memória, vozes (e loops) mixados pelo dispositivo
 ├─ scene/                Scene (interface) e SceneStack (transições adiadas)
 └─ scenes/               MenuScene, InteriorScene, FlightScene, StatusScene,
-                         PauseScene, GameOverScene, DebugScene (só no build debug)
+                         RepairScene, PauseScene, GameOverScene,
+                         DebugScene (só no build debug)
 ```
 
 Quem é dono de tudo é o `App`: ele cria janela, renderer e subsistemas, e passa
@@ -115,6 +116,11 @@ diretivas — `legenda <caractere> <nome-do-tile>`, `marcador <nome> <x> <y>` (e
 tiles, aceita fração) e `mapa`, que abre a grade — e o próprio arquivo explica o
 formato no cabeçalho. Um novo ambiente é um arquivo novo mais um
 `carregar("maps/<nome>.mapa")`.
+
+Os marcadores são o que tira as posições dos móveis do código: `console` e
+`bancada` dão o canto superior esquerdo de cada um, e a `InteriorScene` monta a
+partir daí o retângulo sólido e a zona de interação. Mover a bancada para o outro
+canto do convés é editar uma linha do mapa.
 
 O que **não** está no arquivo: os nomes de tile válidos, o índice de cada um no
 atlas e quais são sólidos. Isso vive na tabela `kDefinicoes` no topo de
