@@ -900,6 +900,8 @@ O que acontece em um passo:
   esfera de raio 2 da nave contra elas.
 - **Ambiente sonoro.** O ganho persegue um alvo que depende do turbo e do casco
   (adiante).
+- **Alarme.** Com o casco em estado crítico, a sirene e a luz de emergência do
+  convés andam mais um ciclo (adiante).
 
 Na batida, a nave quase para (18 u/s), a rocha é reposicionada, um som toca e
 `batida_` vai a 1 e decai a 3,4 por segundo. `Flight` não sacode nada: ele expõe
@@ -945,6 +947,44 @@ Se cada cena aplicasse o próprio ganho ao entrar, a passagem convés → cabine
 seria um **degrau** audível. Estando no `Flight`, ela é um *swell*: o casco para
 de abafar no instante em que a cortina começa a fechar, e o som abre junto com a
 imagem.
+
+### O alarme do casco crítico
+
+Abaixo de 30% de casco (`Flight::kCascoCritico`) a nave passa a avisar: uma
+**sirene** toca e a iluminação do convés vai e volta do vermelho. As duas coisas
+são, por dentro, a mesma coisa — e é isso que vale registrar. Cada passo,
+`Flight::atualizar` calcula **um número só**, `alarme()`, entre 0 e 1:
+
+```cpp
+faseAlarme_ = fmod(faseAlarme_ + kTau * kFreqAlarme * dt, kTau);   // ~0,85 ciclo/s
+intensidadeAlarme_ = aproximar(intensidadeAlarme_, critico() ? 1 : 0, kTaxaAlarme, dt);
+alarme_ = intensidadeAlarme_ * (0.5f - 0.5f * cos(faseAlarme_));
+```
+
+A **fase** anda sempre, com o casco inteiro ou não; quem entra e sai é a
+**intensidade**, pela mesma suavização exponencial do ambiente. O alarme abre e
+fecha em rampa em vez de estalar no meio de um ciclo, e uma nave já perdida se
+cala junto com o resto — `critico()` exige `!destruida()`.
+
+Desse número saem as duas manifestações: o ganho da voz da sirene, ali mesmo no
+`Flight`, e o alfa do vermelho que a `InteriorScene` pinta sobre o convés. **Um
+número só, de propósito.** A ida e a volta da sirene poderiam estar gravadas no
+próprio WAV, o que seria até mais simples de gerar; mas aí o som andaria pelo
+relógio do dispositivo de áudio e a luz pelo passo fixo da simulação, que são
+dois relógios diferentes, e em poucos minutos de viagem o pisca-pisca estaria
+fora do compasso do som — sem como realinhá-los depois. Por isso o WAV é só o
+*timbre* (uma fundamental de 620 Hz com a quinta e a oitava por cima, em loop) e
+o vaivém é do jogo.
+
+A voz da sirene nasce no `iniciar` e toca a viagem inteira, **calada**, como o
+ambiente: o que muda com o casco é o ganho, não a existência da voz. Assim não há
+loop nascendo e morrendo no meio do voo — e, como o limite de 16 vozes nunca
+engole um *loop* (seção 14), a nave não fica sem o aviso justo quando ele
+importa.
+
+A fronteira dos 30% é uma só: quem escreve `CRITICO` no diagnóstico (`faixaDo`,
+em `StatusScene.cpp`) lê a mesma `Flight::kCascoCritico`. A sirene não pode estar
+tocando sobre um mostrador que ainda diz `AVARIADO`.
 
 ---
 
@@ -1003,7 +1043,14 @@ if (voo_.batida() > 0.0f) { camera.definirPosicao(/* ...seno... */); }
 
 Somado em `camera_`, o deslocamento realimentaria o seguidor, que perseguiria o
 alvo a partir da posição já sacudida — e o tremor viraria deriva. Em uma cópia,
-ele é só imagem. O convite é ancorado no console mas desenhado em coordenadas de
+ele é só imagem.
+
+A **luz de emergência** também é desenho e nada mais: um retângulo vermelho do
+tamanho da tela, com o alfa saindo de `voo_.alarme()` (seção 12). A ordem importa
+— ele entra **depois da nave e antes da HUD**: a lâmpada é do convés, e tingir o
+convite e a barra de dicas só custaria legibilidade justo quando há pressa para
+ler. No vale do ciclo o alfa é zero e a iluminação normal volta inteira; não há
+dois estados, só o número indo e voltando. O convite é ancorado no console mas desenhado em coordenadas de
 tela, com `medir()` dando o tamanho da tarja — e são **duas linhas de mesma
 largura**, `[E] Assumir os controles` e `[Q] Diagnostico do casco`, exatamente
 para a tarja sair retangular e as duas opções ficarem centralizadas sobre o
@@ -1255,6 +1302,14 @@ dobra), o que soa grave e encorpado — mais próximo de um casco vibrando que d
 chiado. E o filtro que o produz é rodado **em círculo**, ou seja, o fim do sinal
 alimenta o começo: é isso que faz o WAV emendar consigo mesmo sem estalo quando o
 loop dá a volta.
+
+**A sirene (`sirene.wav`) é só o timbre.** O arquivo é um tom sustentado — a
+fundamental de 620 Hz mais a quinta e a oitava, que dão o corte metálico que um
+seno puro não tem —, e não a sirene indo e voltando: quem faz o vaivém é o ganho,
+no `Flight` (seção 12). Como todo *loop*, ele precisa emendar consigo mesmo, e
+aqui isso é uma conta e não um filtro: cada parcial tem que fechar um número
+inteiro de ciclos na duração do arquivo. O gerador confere isso e recusa uma
+combinação que não feche, em vez de gravar um WAV que estala a cada volta.
 
 **A fonte não depende do sistema.** `assets/fonts/unscii-16.ttf` está em domínio
 público e acompanha o repositório justamente para que gerar o atlas não dependa

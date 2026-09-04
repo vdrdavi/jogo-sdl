@@ -33,6 +33,14 @@ constexpr float kAmbienteSaida = 0.35f; // s de fade ao encerrar
 /// Quanto do lado de fora atravessa o casco.
 constexpr float kAbafamento = 0.34f;
 
+// Alarme do casco critico. Pouco menos de um ciclo por segundo: rapido o
+// bastante para soar urgente, lento o bastante para a luz do conves piscar em
+// vez de tremular.
+constexpr float kFreqAlarme = 0.85f;   // ciclos/s
+constexpr float kTaxaAlarme = 2.5f;    // 1/s, entrada e saida do alarme
+constexpr float kGanhoSirene = 0.55f;
+constexpr float kTau = 6.283185307f;
+
 /// Suavizacao exponencial estavel em passo fixo.
 float aproximar(float atual, float alvo, float taxa, float dt) {
     return atual + (alvo - atual) * (1.0f - std::exp(-taxa * dt));
@@ -59,11 +67,23 @@ void Flight::iniciar(Context& ctx, Uint32 semente) {
     somImpacto_ = ctx.audio.carregar("audio/impacto.wav");
     somDestruicao_ = ctx.audio.carregar("audio/destruicao.wav");
     vozAmbiente_ = ctx.audio.tocarEmLoop(somAmbiente_, ambiente_);
+
+    // A sirene toca a viagem inteira, calada: o que muda com o casco e o ganho
+    // dela, nao a existencia da voz. Assim nao ha loop para nascer e morrer no
+    // meio do voo -- e uma voz de loop nunca e engolida pelo limite de vozes,
+    // entao a nave nunca ficaria sem o aviso justo quando ele importa.
+    faseAlarme_ = 0.0f;
+    intensidadeAlarme_ = 0.0f;
+    alarme_ = 0.0f;
+    somSirene_ = ctx.audio.carregar("audio/sirene.wav");
+    vozSirene_ = ctx.audio.tocarEmLoop(somSirene_, 0.0f);
 }
 
 void Flight::encerrar(Context& ctx) {
     ctx.audio.parar(vozAmbiente_, kAmbienteSaida);
     vozAmbiente_ = 0;
+    ctx.audio.parar(vozSirene_, kAmbienteSaida);
+    vozSirene_ = 0;
 }
 
 float Flight::fatorTurbo() const {
@@ -121,6 +141,22 @@ void Flight::atualizar(Context& ctx, float dt, const Comando& comando) {
                           (abafado_ ? kAbafamento : 1.0f);
     ambiente_ = aproximar(ambiente_, alvo, kTaxaAmbiente, dt);
     ctx.audio.ajustarGanho(vozAmbiente_, ambiente_);
+
+    // O alarme do casco critico. A fase anda sempre, com casco inteiro ou nao;
+    // quem entra e sai e a intensidade, pela mesma rampa do ambiente -- o
+    // alarme abre e fecha em vez de estalar no meio de um ciclo, e uma nave
+    // perdida se cala junto com o resto.
+    //
+    // Sai daqui um numero so, `alarme_`, e ele serve a duas coisas: o ganho da
+    // sirene e a luz vermelha que a InteriorScene acende sobre o conves. E um
+    // so de proposito. A ida e a volta da sirene poderiam estar gravadas no
+    // WAV, mas entao ela andaria pelo relogio do dispositivo de audio enquanto
+    // a luz andaria pelo passo fixo, e em poucos minutos de viagem o pisca-pisca
+    // estaria fora do compasso do som.
+    faseAlarme_ = std::fmod(faseAlarme_ + kTau * kFreqAlarme * dt, kTau);
+    intensidadeAlarme_ = aproximar(intensidadeAlarme_, critico() ? 1.0f : 0.0f, kTaxaAlarme, dt);
+    alarme_ = intensidadeAlarme_ * (0.5f - 0.5f * std::cos(faseAlarme_));
+    ctx.audio.ajustarGanho(vozSirene_, alarme_ * kGanhoSirene);
 }
 
 void Flight::checarColisao(Context& ctx) {

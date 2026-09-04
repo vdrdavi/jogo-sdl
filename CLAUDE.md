@@ -171,6 +171,13 @@ emenda. O WAV do loop também precisa emendar sozinho — `gerar_ambiente` em
 `tools/gen_assets.py` roda o filtro do ruído marrom em círculo justamente para
 isso.
 
+**A sirene do casco crítico** é outra voz em loop que toca a viagem inteira,
+calada até `casco() <= kCascoCritico`. `Flight::alarme()` é **um número só** que
+abre o ganho dela e acende a luz vermelha da `InteriorScene`: não grave o vaivém
+no WAV, senão o som passa a andar pelo relógio do dispositivo de áudio e sai do
+compasso da luz, que anda pelo passo fixo. `kCascoCritico` também é a fronteira
+do `CRITICO` do diagnóstico — é uma só de propósito.
+
 ## Dependências
 
 **Só SDL3 ≥ 3.4.** O SDL 3.4 traz `SDL_LoadPNG` e `SDL_LoadWAV` no core, o texto

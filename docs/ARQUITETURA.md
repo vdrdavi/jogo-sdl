@@ -64,7 +64,9 @@ e vive na `InteriorScene`, que o atualiza em piloto automático enquanto o jogad
 anda pelo convés. A `FlightScene` recebe uma referência para o mesmo `Flight` e
 apenas o comanda e o desenha — sair da cabine não interrompe o voo, e uma batida
 com o jogador lá dentro chega como sacudida da câmera e um baque abafado. Cada
-batida também cobra um pedaço do casco; quando ele zera, a nave está perdida, e
+batida também cobra um pedaço do casco; abaixo de `Flight::kCascoCritico` a nave
+soa a sirene e acende a luz de emergência do convés — as duas saem do mesmo
+`Flight::alarme()`, para nunca piscarem separadas. Quando o casco zera, a nave está perdida, e
 quem quer que esteja no topo da pilha entrega a vez à `FlightScene`, que mostra
 os destroços de fora e termina na `GameOverScene`.
 
