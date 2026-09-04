@@ -374,6 +374,41 @@ def gerar_impacto(nome: str, duracao: float = 0.5, taxa: int = 22050,
     print(f"{nome}: {duracao * 1000:.0f} ms (baque de ruido marrom)")
 
 
+def gerar_sirene(nome: str, duracao: float = 0.5, taxa: int = 22050,
+                 freq: float = 620.0) -> None:
+    """Tom continuo da sirene de casco critico, em loop.
+
+    O que faz isto soar como uma sirene nao esta no arquivo: o WAV e so o
+    timbre, e quem o faz ir e voltar e o `Flight`, abrindo e fechando o ganho
+    desta voz uma vez por ciclo do alarme (veja Flight::alarme). A ida e a volta
+    ficam do lado do jogo, e nao gravadas aqui, porque e o mesmo numero que
+    acende a luz vermelha do conves -- gravada no WAV, ela andaria pelo relogio
+    do dispositivo de audio e se separaria da luz em poucos minutos.
+
+    O timbre e uma fundamental com a quinta e a oitava por cima: o corte
+    metalico que um seno puro nao tem. Toda parcial precisa fechar um numero
+    inteiro de ciclos na duracao, senao a onda nao emenda no fim do loop e a
+    volta estala.
+    """
+    parciais = ((1.0, 1.0), (1.5, 0.45), (2.0, 0.25))
+    for multiplo, _ in parciais:
+        ciclos = freq * multiplo * duracao
+        if abs(ciclos - round(ciclos)) > 1e-9:
+            raise SystemExit(f"parcial {multiplo}x de {freq} Hz nao fecha o loop "
+                             f"em {duracao} s ({ciclos} ciclos)")
+
+    total = int(taxa * duracao)
+    amostras = []
+    for i in range(total):
+        t = i / taxa
+        amostras.append(sum(peso * math.sin(2.0 * math.pi * freq * multiplo * t)
+                            for multiplo, peso in parciais))
+
+    pico = max(abs(v) for v in amostras) or 1.0
+    escrever_wav(nome, [v / pico * 0.7 for v in amostras], taxa)
+    print(f"{nome}: {duracao * 1000:.0f} ms @ {freq:.0f} Hz em loop (tom do alarme)")
+
+
 def main() -> None:
     for sub in ("textures", "fonts", "audio"):
         (ASSETS / sub).mkdir(parents=True, exist_ok=True)
@@ -386,6 +421,7 @@ def main() -> None:
     gerar_wav("confirm.wav", 990.0, 0.14)
     gerar_wav("back.wav", 330.0, 0.12)
     gerar_ambiente("espaco.wav")
+    gerar_sirene("sirene.wav")
     gerar_impacto("impacto.wav")
     # O fim da nave: o mesmo baque, mais grave e com uma cauda que dura o
     # tempo de ver os destrocos se afastarem.

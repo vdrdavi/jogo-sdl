@@ -23,7 +23,9 @@ constexpr SDL_Color kCorTrilho{14, 26, 40, 255};
 constexpr SDL_Color kCorPerda{235, 110, 105, 255};
 
 /// Faixas do casco: a cor e a palavra saem da mesma fronteira, para o texto
-/// nunca dizer "integro" sobre uma barra ja alaranjada.
+/// nunca dizer "integro" sobre uma barra ja alaranjada. A fronteira do critico
+/// e a do Flight, a mesma que liga a sirene e a luz de emergencia -- o
+/// mostrador nao pode dizer AVARIADO com o alarme tocando.
 struct Faixa {
     SDL_Color cor;
     const char* palavra;
@@ -33,7 +35,7 @@ Faixa faixaDo(float casco) {
     if (casco > 0.6f) {
         return Faixa{SDL_Color{120, 220, 150, 255}, "INTEGRO"};
     }
-    if (casco > 0.3f) {
+    if (casco > Flight::kCascoCritico) {
         return Faixa{SDL_Color{245, 190, 110, 255}, "AVARIADO"};
     }
     return Faixa{kCorPerda, "CRITICO"};

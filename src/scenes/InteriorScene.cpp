@@ -17,6 +17,11 @@ namespace {
 constexpr SDL_Color kCorHud{226, 232, 240, 255};
 constexpr SDL_Color kCorPainel{12, 14, 22, 170};
 constexpr SDL_FPoint kTamanhoJogador{20.0f, 12.0f};  // caixa de colisao (pes)
+/// A luz de emergencia: a cor da lampada e quanto dela cobre o conves no pico
+/// do ciclo. Nao chega perto de opaco de proposito -- o ciclo vai do vermelho a
+/// iluminacao normal e volta, e o conves precisa continuar legivel nos dois.
+constexpr SDL_Color kCorAlarme{190, 26, 34, 255};
+constexpr float kAlfaAlarme = 104.0f;
 constexpr float kCelulaJogador = 32.0f;  // celula da folha textures/player.png
 
 SDL_FPoint interpolar(SDL_FPoint anterior, SDL_FPoint atual, float alpha) {
@@ -281,6 +286,20 @@ void InteriorScene::desenhar(Context& ctx, float alpha) {
     jogador.espelho = espelho_;
     jogador.recorte = animacaoJogador_.recorte();
     draw::sprite(ctx.renderer, camera, jogador, desenhada);
+
+    // Luz de emergencia: com o casco em estado critico, o conves inteiro vai e
+    // volta do vermelho no mesmo compasso da sirene -- os dois saem do mesmo
+    // voo_.alarme(), entao a luz nunca pisca fora do som. Entra depois da nave
+    // e antes da HUD: a lampada e da nave, e tingir o texto so custaria
+    // legibilidade justo quando ha pressa para ler.
+    if (voo_.alarme() > 0.0f) {
+        SDL_Color luz = kCorAlarme;
+        luz.a = static_cast<Uint8>(kAlfaAlarme * voo_.alarme());
+        draw::retanguloTela(ctx.renderer,
+                            SDL_FRect{0.0f, 0.0f, static_cast<float>(App::kLarguraLogica),
+                                      static_cast<float>(App::kAlturaLogica)},
+                            luz);
+    }
 
     // Convite de interacao, ancorado no console e em coordenadas de tela.
     if (pertoDoConsole()) {

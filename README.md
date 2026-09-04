@@ -4,8 +4,9 @@ Você anda pelo interior de uma nave em 2D, usa o painel de pilotagem do convés
 a tela vira um voo 3D: um caça low poly atravessando um campo de estrelas gerado
 proceduralmente, desviando de asteroides. O mesmo painel também abre o
 diagnóstico do casco, que perde um pedaço a cada rocha — inclusive nas batidas
-que acontecem enquanto você anda lá dentro. Quando o casco acaba, a nave se
-despedaça na vista externa e a viagem termina ali.
+que acontecem enquanto você anda lá dentro. No fim do casco a nave passa a
+avisar: a sirene toca e o convés pisca em vermelho. Quando o casco acaba, a nave
+se despedaça na vista externa e a viagem termina ali.
 
 ![Interior da nave: convés de tiles, janelas para o espaço e o painel de pilotagem com o convite para assumir os controles](docs/interior.png)
 
@@ -212,6 +213,14 @@ Sem `SDL3_mixer`: cada reprodução é um `SDL_AudioStream` ligado ao dispositiv
 que faz a mixagem. Além dos efeitos, a viagem tem um ambiente em *loop* — ruído
 marrom cujo ganho acompanha o esforço do motor. Ele toca do convés à cabine,
 abafado enquanto o casco está no caminho, e entra e sai em rampa.
+
+Com o casco em estado crítico entra a **sirene**, uma segunda voz em *loop* que
+toca a viagem inteira mas só abre o ganho aí. O que a faz soar como sirene não
+está no WAV: o `Flight` calcula um número por passo, `alarme()`, que abre e fecha
+o ganho da voz **e** acende a luz vermelha do convés. É um número só de
+propósito — gravada no arquivo, a sirene andaria pelo relógio do dispositivo de
+áudio enquanto a luz anda pelo passo fixo, e as duas sairiam do compasso em
+poucos minutos.
 
 O WAV do ambiente é gerado em `tools/gen_assets.py` por um integrador com
 vazamento rodado **em círculo**: uma passada só para aquecer o estado e outra
