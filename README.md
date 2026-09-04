@@ -120,6 +120,13 @@ cmake --preset debug -DCMAKE_PREFIX_PATH="$HOME/sdl3"
 | Tela cheia | F11 | — |
 | Menu (na pausa) | M | — |
 | Voltar ao menu (fim de jogo) | Enter ou Esc | A / B / Start |
+| **Tela de depuração** (só no build debug) | **F3** | — |
+
+O F3 abre a tela de depuração de qualquer lugar do jogo: quadros por segundo,
+onde o jogo está rodando (sistema, drivers de vídeo e áudio, renderer, janela,
+caminhos dos arquivos) e o estado da nave, a começar pela integridade do casco.
+Ela é uma ferramenta de quem desenvolve, não uma tela do jogo — no build
+`release` nem o código nem a tecla existem.
 
 As preferências — volume, tela cheia e os vínculos de cada ação — são gravadas
 em `config.ini` no diretório de configuração do sistema (`SDL_GetPrefPath`:

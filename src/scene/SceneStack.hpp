@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <cstddef>
 #include <vector>
 
 #include "scene/Scene.hpp"
@@ -27,6 +28,13 @@ public:
 
     bool vazia() const { return pilha_.empty(); }
     Scene* topo() { return pilha_.empty() ? nullptr : pilha_.back().get(); }
+
+    /// A pilha por dentro, da base (0) para o topo. O jogo se move sempre pelo
+    /// topo; quem olha para baixo e a tela de depuracao (F3), que pode ser
+    /// aberta em qualquer lugar e precisa achar a viagem em curso sem saber de
+    /// antemao qual cena a guarda.
+    std::size_t tamanho() const { return pilha_.size(); }
+    Scene* em(std::size_t indice) { return pilha_[indice].get(); }
 
 private:
     enum class Tipo { Empilhar, Desempilhar, Substituir, Limpar };

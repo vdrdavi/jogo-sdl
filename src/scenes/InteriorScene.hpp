@@ -30,6 +30,11 @@ public:
     void atualizar(Context& ctx, float dt) override;
     void desenhar(Context& ctx, float alpha) override;
 
+    /// A viagem que esta cena guarda. A cabine e o painel do casco a recebem
+    /// pelo construtor; quem pergunta aqui e a tela de depuracao, que procura o
+    /// voo percorrendo a pilha de cenas.
+    Flight& voo() { return voo_; }
+
 private:
     static constexpr int kTile = MapaDeTiles::kTile;
     static constexpr float kVelocidade = 96.0f;
