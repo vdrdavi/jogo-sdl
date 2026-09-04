@@ -122,12 +122,17 @@ cmake --preset debug -DCMAKE_PREFIX_PATH="$HOME/sdl3"
 | Menu (na pausa) | M | — |
 | Voltar ao menu (fim de jogo) | Enter ou Esc | A / B / Start |
 | **Tela de depuração** (só no build debug) | **F3** | — |
+| **Nave invencível** (só no build debug) | **F4** | — |
 
 O F3 abre a tela de depuração de qualquer lugar do jogo: quadros por segundo,
 onde o jogo está rodando (sistema, drivers de vídeo e áudio, renderer, janela,
 caminhos dos arquivos) e o estado da nave, a começar pela integridade do casco.
-Ela é uma ferramenta de quem desenvolve, não uma tela do jogo — no build
-`release` nem o código nem a tecla existem.
+O F4, ao lado dele, deixa a nave atravessar as rochas sem bater — sem baque, sem
+som e sem estrago —, para conferir uma cena demorada sem que a viagem acabe no
+meio; enquanto está ligado, um selo âmbar **INVENCIVEL (F4)** fica no canto da
+tela. Ele não conserta o casco: o que já se quebrou continua quebrado. As duas
+são ferramentas de quem desenvolve, não telas do jogo — no build `release` nem o
+código nem as teclas existem.
 
 As preferências — volume, tela cheia e os vínculos de cada ação — são gravadas
 em `config.ini` no diretório de configuração do sistema (`SDL_GetPrefPath`:

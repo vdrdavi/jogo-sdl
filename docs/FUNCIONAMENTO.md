@@ -1226,7 +1226,7 @@ encerra a viagem de fato é o `aoSair` da `InteriorScene`, que apaga o ambiente.
 Ela também **ignora as teclas enquanto a cortina ainda está abrindo**: a tecla
 que o jogador estava segurando quando a nave se abriu não pode pular o fim.
 
-### DebugScene — a tela de depuração (só no build debug)
+### DebugScene — a tela de depuração e o F4 (só no build debug)
 
 Arquivo: [`src/scenes/DebugScene.cpp`](../src/scenes/DebugScene.cpp).
 
@@ -1243,9 +1243,10 @@ mostra o que nenhum HUD mostra, em três blocos.
   sendo lidos e onde ficam as preferências. Cada uma dessas linhas já foi, um
   dia, uma hipótese errada sobre a máquina de alguém.
 - **Nave**: a integridade do casco (em porcentagem e no valor cru com que o
-  código a compara), se ela está em cruzeiro, em turbo ou destruída, velocidade,
-  o decaimento da última batida, posição, rumo em graus e o campo de rochas.
-  Fora de uma viagem — no menu — o bloco diz que não há viagem em curso.
+  código a compara), se ela está em cruzeiro, em turbo ou destruída, se a
+  proteção do F4 está ligada, velocidade, o decaimento da última batida,
+  posição, rumo em graus e o campo de rochas. Fora de uma viagem — no menu — o
+  bloco diz que não há viagem em curso.
 
 Quatro decisões, e o motivo de cada uma.
 
@@ -1282,6 +1283,37 @@ Uma consequência boa dessa última decisão: o casco pode ceder com o painel
 aberto, e a `DebugScene` não precisa saber disso. Quem entrega a vista externa é
 a cena de baixo, olhando `Flight::destruida()` — que é estado, e não um aviso que
 se perde — no primeiro passo depois que o painel sair da frente.
+
+#### F4 — a nave invencível
+
+A outra tecla de ferramenta do mesmo arquivo. **F4** liga e desliga a
+**invencibilidade** da nave em curso: enquanto ela está ligada, `Flight` não
+chama `checarColisao` e a nave atravessa as rochas — sem baque, sem som de
+impacto e sem estrago. É o que deixa olhar o campo de asteroides, o ambiente
+sonoro ou uma cena demorada sem que a viagem acabe no meio da conferência.
+
+Ela **não conserta nada**. O casco fica no valor em que estava, com o alarme que
+estiver tocando, e uma nave já perdida continua perdida: invencível é não levar
+dano novo, não voltar do fim. E ela **sobrevive a um `Flight::iniciar()`** — quem
+ligou a trapaça não a perde ao recomeçar a viagem, mas uma partida nova, que
+constrói uma `InteriorScene` nova, traz um `Flight` novo e mortal.
+
+**O estado é do `Flight`, e não da cena** — pela mesma razão de todo o resto da
+viagem: a nave bate com o piloto no convés tanto quanto na cabine, então o que
+decide se ela bate tem que morar onde mora a colisão. Fora do build de
+depuração, `Flight::invencivel()` é um `static constexpr bool` que devolve
+`false`: o `if` do passo do voo some na compilação em vez de espalhar `#ifdef`
+por dentro dele.
+
+**O aviso na tela é do `App`, e não de uma cena.** Depois de `cenas_.desenhar()`,
+uma função de `DebugScene.cpp` desenha o selo âmbar **INVENCIVEL (F4)** no canto
+superior direito — âmbar, e não o azul do HUD nem o vermelho da avaria, porque
+ele não é informação do jogo: é o aviso de que o que está na tela **não vale como
+teste**. Ficando no `App`, ele aparece de qualquer lugar da viagem (convés,
+cabine, painel do casco, pausa) sem que nenhuma dessas cenas precise saber que a
+trapaça existe. A exceção é a própria `DebugScene`: sobre ela o selo se cala,
+porque a linha `protecao` do bloco **Nave** já diz o mesmo com todas as letras, e
+um aviso por cima de um painel de leitura só taparia número.
 
 ### A cortina entre o convés e a cabine
 
@@ -1530,7 +1562,10 @@ o loop do ambiente, os fades e o abafamento do casco foram conferidos.
 depuração, **F3** abre a tela de depuração de qualquer lugar (seção 13): é onde
 se descobre que o renderer não é o que se imaginava, que os assets estão vindo de
 uma cópia velha ao lado de outro binário, ou que o casco já estava em 50% antes
-do teste começar. Ela não é determinística — é o painel de instrumentos.
+do teste começar. Ela não é determinística — é o painel de instrumentos. Ao lado
+dela, **F4** deixa a nave invencível (seção 13): serve para conferir uma cena
+demorada sem que uma rocha encerre a viagem no meio — e o selo âmbar no canto
+lembra que aquela execução não vale como teste do jogo.
 
 Nada de "está suave" ou "está audível": **RMS** por janela de tempo para volume
 percebido, diferença amostra a amostra na virada do loop comparada com a média do
@@ -1572,6 +1607,7 @@ mudança vai no corpo da mensagem de commit.
 | **Cena** | Uma tela do jogo (menu, convés, cabine, pausa), que vive na pilha de cenas. |
 | **Clipe (animação)** | Uma linha da folha de sprites tocada como sequência: quantos quadros e a que ritmo. |
 | **Cortina (transição)** | Retângulo de cor que cobre a tela para emendar duas cenas sem corte. |
+| **Invencibilidade (F4)** | Trapaça do build de depuração que faz a nave atravessar as rochas sem colidir; o selo âmbar no canto avisa que ela está ligada. |
 | **Culling** | Descartar cedo o que não vai aparecer, para não pagar por desenhá-lo. |
 | **dB por oitava** | Quanto a amplitude cai cada vez que a frequência dobra. |
 | **Delta time** | Tempo real decorrido entre dois quadros. |

@@ -5,8 +5,8 @@
 #include "core/Log.hpp"
 
 // A tela de depuracao so e compilada na build de depuracao (veja o
-// CMakeLists.txt): fora dela o arquivo nem entra na lista de fontes, e o F3
-// abaixo nao existe.
+// CMakeLists.txt): fora dela o arquivo nem entra na lista de fontes, e nem o F3
+// nem o F4 abaixo existem.
 #ifdef JOGO_DEBUG
 #include "scenes/DebugScene.hpp"
 #endif
@@ -131,6 +131,12 @@ void App::processarEventos(Context& ctx) {
                 if (evento.key.scancode == SDL_SCANCODE_F3 && !evento.key.repeat) {
                     DebugScene::alternar(cenas_);
                 }
+                // O F4 e da mesma familia: liga e desliga a invencibilidade da
+                // nave, para conferir uma cena demorada sem que a viagem acabe
+                // no meio. Quem a mostra na tela e o selo, mais abaixo.
+                if (evento.key.scancode == SDL_SCANCODE_F4 && !evento.key.repeat) {
+                    alternarInvencibilidade(cenas_);
+                }
 #endif
                 break;
             default:
@@ -188,6 +194,11 @@ void App::rodar(ScenePtr cenaInicial) {
         SDL_SetRenderDrawColor(renderer_.get(), 18, 20, 28, 255);
         SDL_RenderClear(renderer_.get());
         cenas_.desenhar(ctx, relogio_.alpha());
+#ifdef JOGO_DEBUG
+        // Depois das cenas, e nao dentro de uma: a nave invencivel e da viagem
+        // inteira, e o aviso precisa aparecer de qualquer lugar dela.
+        desenharSeloInvencivel(ctx);
+#endif
         SDL_RenderPresent(renderer_.get());
 
         // Transicoes de cena so aqui: nunca no meio de um update ou desenho.

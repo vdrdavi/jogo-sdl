@@ -11,7 +11,7 @@ os termos explicados, veja [Como o jogo funciona por dentro](FUNCIONAMENTO.md).
 src/
 ├─ main.cpp              cria o App e empilha a MenuScene
 ├─ core/
-│  ├─ App.*              janela, renderer, laço principal, F11, F3, FPS no título
+│  ├─ App.*              janela, renderer, laço principal, F11, F3, F4, FPS no título
 │  ├─ Time.hpp           StepTimer: acumulador de passo fixo + alpha
 │  ├─ Paths.*            diretório de assets e diretório de preferências
 │  ├─ Config.*           lê e grava as preferências (volume, tela cheia, teclas)
@@ -102,7 +102,10 @@ Cadastre o `.cpp` novo na lista de fontes do `CMakeLists.txt`.
 Uma cena que só existe para quem desenvolve entra por outro caminho: a
 [`DebugScene`](../src/scenes/DebugScene.hpp), que o **F3** abre e fecha, é
 cadastrada com `$<$<CONFIG:Debug>:...>` e o gancho do F3 em `App.cpp` fica atrás
-de `#ifdef JOGO_DEBUG` — no build release não há nem o código nem a tecla.
+de `#ifdef JOGO_DEBUG` — no build release não há nem o código nem a tecla. O
+mesmo arquivo guarda as ferramentas de depuração que não são a tela: o **F4**,
+que deixa a nave invencível, e o selo que o `App` desenha por cima das cenas
+enquanto ela está.
 
 ## Como editar o cenário
 

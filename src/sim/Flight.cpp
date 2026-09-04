@@ -125,7 +125,11 @@ void Flight::atualizar(Context& ctx, float dt, const Comando& comando) {
     // quem colide com elas -- enquanto ha nave para colidir.
     rochas_.atualizar(dt);
     rochas_.centralizar(pose_.posicao);
-    if (!destruida()) {
+    // Invencivel (F4, so na build de depuracao) e simplesmente nao checar a
+    // colisao: sem batida nao ha baque, som nem estrago, e a nave atravessa o
+    // campo. Fora dessa build a condicao e uma constante falsa e some na
+    // compilacao.
+    if (!destruida() && !invencivel()) {
         checarColisao(ctx);
     }
     batida_ = std::max(0.0f, batida_ - kDecaimentoBatida * dt);

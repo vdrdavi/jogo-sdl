@@ -56,6 +56,24 @@ public:
     /// Liga enquanto o jogador estiver no interior: o casco abafa o lado de fora.
     void definirAbafado(bool abafado) { abafado_ = abafado; }
 
+#ifdef JOGO_DEBUG
+    /// A trapaca de quem desenvolve, que o F4 liga e desliga (so na build de
+    /// depuracao): a nave atravessa as rochas sem bater -- sem baque, sem som e
+    /// sem estrago. E o jeito de olhar o campo, o ambiente ou uma cena demorada
+    /// sem que a viagem acabe no meio da conferencia.
+    ///
+    /// Ela **nao conserta nada**: o casco fica no valor em que estava, com o
+    /// alarme que estiver tocando, e uma nave ja perdida continua perdida --
+    /// invencivel e nao levar dano novo, nao voltar do fim. E sobrevive a um
+    /// `iniciar()`: quem ligou a trapaca nao a perde ao recomecar a viagem.
+    void alternarInvencivel() { invencivel_ = !invencivel_; }
+    bool invencivel() const { return invencivel_; }
+#else
+    /// Fora da build de depuracao a trapaca nao existe. Este `false` constante
+    /// e o que apaga a checagem no passo do voo sem espalhar `#ifdef` por ele.
+    static constexpr bool invencivel() { return false; }
+#endif
+
     static Mat3 rotacaoDe(const Pose& pose) {
         return Mat3::deEuler(pose.yaw, pose.pitch, pose.roll);
     }
@@ -107,6 +125,9 @@ private:
     float intensidadeAlarme_{0.0f};
     float alarme_{0.0f};
     bool abafado_{true};
+#ifdef JOGO_DEBUG
+    bool invencivel_{false};
+#endif
     Audio::SomId somAmbiente_{0};
     Audio::SomId somImpacto_{0};
     Audio::SomId somDestruicao_{0};

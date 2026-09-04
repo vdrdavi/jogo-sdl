@@ -10,6 +10,7 @@
 
 #include "audio/Audio.hpp"
 #include "core/App.hpp"
+#include "core/Log.hpp"
 #include "core/Paths.hpp"
 #include "core/Time.hpp"
 #include "gfx/BitmapFont.hpp"
@@ -32,6 +33,10 @@ constexpr SDL_Color kCorSecao{110, 195, 230, 255};
 constexpr SDL_Color kCorRotulo{104, 124, 146, 255};
 constexpr SDL_Color kCorValor{206, 226, 242, 255};
 constexpr SDL_Color kCorAlerta{235, 110, 105, 255};
+/// O ambar da trapaca: nem o azul do painel nem o vermelho da avaria -- quem
+/// olhar a tela precisa ver de longe que aquilo nao e o jogo funcionando.
+constexpr SDL_Color kCorTrapaca{255, 202, 84, 255};
+constexpr SDL_Color kCorFundoTrapaca{30, 20, 4, 210};
 
 constexpr float kRadParaGrau = 57.29578f;
 
@@ -91,20 +96,6 @@ private:
     float x_;
     float y_;
 };
-
-/// O voo em curso, procurado do topo da pilha para a base -- so para ler, que e
-/// tudo que este painel faz com ele. Quem guarda o Flight e a InteriorScene (a
-/// nave em que se anda e a mesma que voa); a cabine e o painel do casco so tem
-/// referencias para o mesmo objeto, entao achar a InteriorScene mais alta ja e
-/// achar a viagem. nullptr no menu.
-Flight* vooNaPilha(SceneStack& cenas) {
-    for (std::size_t i = cenas.tamanho(); i-- > 0;) {
-        if (auto* interior = dynamic_cast<InteriorScene*>(cenas.em(i))) {
-            return &interior->voo();
-        }
-    }
-    return nullptr;
-}
 
 void desenharDesempenho(Coluna& coluna, const Context& ctx, float alpha) {
     coluna.secao("DESEMPENHO");
@@ -175,6 +166,10 @@ void desenharNave(Coluna& coluna, Flight* voo) {
                  corCasco);
     coluna.campo("estado", voo->destruida() ? "destruida" : (voo->turbo() ? "turbo" : "cruzeiro"),
                  corCasco);
+    // A trapaca do F4 aparece no painel, e nao so no selo por cima do jogo: se
+    // as rochas pararam de doer, o primeiro lugar em que se olha e aqui.
+    coluna.campo("protecao", voo->invencivel() ? "INVENCIVEL (F4)" : "normal (F4 liga)",
+                 voo->invencivel() ? kCorTrapaca : kCorRotulo);
     coluna.campo("veloc.", texto("%.1f u/s  (t %.2f)", static_cast<double>(voo->velocidade()),
                                  static_cast<double>(voo->fatorTurbo())));
     coluna.campo("batida", texto("%.2f", static_cast<double>(voo->batida())));
@@ -191,6 +186,50 @@ void desenharNave(Coluna& coluna, Flight* voo) {
 }
 
 }  // namespace
+
+Flight* vooNaPilha(SceneStack& cenas) {
+    for (std::size_t i = cenas.tamanho(); i-- > 0;) {
+        if (auto* interior = dynamic_cast<InteriorScene*>(cenas.em(i))) {
+            return &interior->voo();
+        }
+    }
+    return nullptr;
+}
+
+void alternarInvencibilidade(SceneStack& cenas) {
+    Flight* voo = vooNaPilha(cenas);
+    if (voo == nullptr) {
+        JOGO_INFO("F4: nao ha viagem em curso para tornar invencivel");
+        return;
+    }
+    voo->alternarInvencivel();
+    JOGO_INFO("F4: nave %s", voo->invencivel() ? "invencivel" : "vulneravel");
+}
+
+void desenharSeloInvencivel(Context& ctx) {
+    // Sobre o painel do F3 o selo se cala: ali a linha "protecao" ja diz o
+    // mesmo, com todas as letras e no lugar em que se procura -- e um aviso por
+    // cima de um painel de leitura so tampa numero.
+    if (dynamic_cast<DebugScene*>(ctx.cenas.topo()) != nullptr) {
+        return;
+    }
+
+    const Flight* voo = vooNaPilha(ctx.cenas);
+    if (voo == nullptr || !voo->invencivel()) {
+        return;
+    }
+
+    // Canto superior direito: o HUD da cabine escreve a velocidade no esquerdo e
+    // as dicas das duas cenas ficam embaixo, centralizadas.
+    const std::string_view selo = "INVENCIVEL (F4)";
+    const SDL_FPoint tamanho = ctx.fonte.medir(selo, 1.0f);
+    const float x = static_cast<float>(App::kLarguraLogica) - tamanho.x - 16.0f;
+    const float y = 12.0f;
+    draw::retanguloTela(
+        ctx.renderer, SDL_FRect{x - 6.0f, y - 4.0f, tamanho.x + 12.0f, tamanho.y + 8.0f},
+        kCorFundoTrapaca);
+    ctx.fonte.desenhar(ctx.renderer, selo, x, y, kCorTrapaca, 1.0f);
+}
 
 void DebugScene::alternar(SceneStack& cenas) {
     if (dynamic_cast<DebugScene*>(cenas.topo()) != nullptr) {

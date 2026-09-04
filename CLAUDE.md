@@ -57,7 +57,11 @@ temporário e reverta depois.
 Com o jogo na frente, **F3 abre a tela de depuração** (só no build debug,
 `src/scenes/DebugScene.*`): quadros por segundo, drivers de vídeo e áudio,
 renderer, tamanho da janela, de onde os assets estão vindo e o estado da nave.
-É o painel de instrumentos, não uma medição determinística.
+É o painel de instrumentos, não uma medição determinística. **F4**, do mesmo
+arquivo, deixa a nave invencível — sem colisão, sem estrago — para conferir uma
+cena demorada sem que uma rocha encerre a viagem; o selo âmbar no canto avisa que
+aquela execução não vale como teste. Ele não repara nada: o casco continua onde
+estava, e uma nave já perdida não volta.
 
 Para o áudio existe o equivalente: o driver `disk` do SDL grava o PCM cru em vez
 de tocar, e aí o som vira número.

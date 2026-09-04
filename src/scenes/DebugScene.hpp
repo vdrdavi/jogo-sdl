@@ -4,8 +4,27 @@
 
 namespace jogo {
 
+struct Context;
 class Flight;
 class SceneStack;
+
+/// A viagem em curso, procurada do topo da pilha para a base; nullptr quando
+/// nao ha nenhuma (no menu). Quem guarda o Flight e a InteriorScene -- a nave em
+/// que se anda e a mesma que voa --, entao achar a InteriorScene mais alta ja e
+/// achar a viagem.
+Flight* vooNaPilha(SceneStack& cenas);
+
+/// Liga e desliga a invencibilidade da nave: e o gancho do F4 no App, irmao do
+/// F3 e da mesma natureza -- uma tecla de ferramenta, que so existe na build de
+/// depuracao. Sem viagem em curso nao ha o que tornar invencivel, e a tecla so
+/// diz isso no log.
+void alternarInvencibilidade(SceneStack& cenas);
+
+/// O aviso de que a nave esta invencivel, desenhado pelo App por cima de tudo,
+/// depois das cenas. Fica fora das cenas de proposito: a trapaca vale para a
+/// viagem inteira -- o conves, a cabine, a pausa --, e nenhuma delas teria por
+/// que saber dela. Nada aparece quando a nave e mortal.
+void desenharSeloInvencivel(Context& ctx);
 
 /// A tela de depuracao, que so existe na build de depuracao (JOGO_DEBUG): F3
 /// abre e fecha, de qualquer lugar do jogo. Mostra o que nao aparece em nenhum
