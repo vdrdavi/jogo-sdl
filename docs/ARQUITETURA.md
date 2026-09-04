@@ -11,7 +11,7 @@ os termos explicados, veja [Como o jogo funciona por dentro](FUNCIONAMENTO.md).
 src/
 ├─ main.cpp              cria o App e empilha a MenuScene
 ├─ core/
-│  ├─ App.*              janela, renderer, laço principal, F11, FPS no título
+│  ├─ App.*              janela, renderer, laço principal, F11, F3, FPS no título
 │  ├─ Time.hpp           StepTimer: acumulador de passo fixo + alpha
 │  ├─ Paths.*            diretório de assets e diretório de preferências
 │  ├─ Config.*           lê e grava as preferências (volume, tela cheia, teclas)
@@ -39,7 +39,7 @@ src/
 ├─ audio/Audio.*         WAVs em memória, vozes (e loops) mixados pelo dispositivo
 ├─ scene/                Scene (interface) e SceneStack (transições adiadas)
 └─ scenes/               MenuScene, InteriorScene, FlightScene, StatusScene,
-                         PauseScene, GameOverScene
+                         PauseScene, GameOverScene, DebugScene (só no build debug)
 ```
 
 Quem é dono de tudo é o `App`: ele cria janela, renderer e subsistemas, e passa
@@ -86,6 +86,11 @@ Ela é **estado de cena, não uma cena de overlay**: uma cena teria que sobreviv
 tiraria de quem está embaixo o passo de simulação do voo.
 
 Cadastre o `.cpp` novo na lista de fontes do `CMakeLists.txt`.
+
+Uma cena que só existe para quem desenvolve entra por outro caminho: a
+[`DebugScene`](../src/scenes/DebugScene.hpp), que o **F3** abre e fecha, é
+cadastrada com `$<$<CONFIG:Debug>:...>` e o gancho do F3 em `App.cpp` fica atrás
+de `#ifdef JOGO_DEBUG` — no build release não há nem o código nem a tecla.
 
 ## Como editar o cenário
 

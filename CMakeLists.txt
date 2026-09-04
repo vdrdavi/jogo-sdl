@@ -51,6 +51,13 @@ add_executable(jogo
 target_include_directories(jogo PRIVATE src)
 target_link_libraries(jogo PRIVATE SDL3::SDL3)
 
+# A tela de depuracao (F3) e uma ferramenta de quem desenvolve, nao uma tela do
+# jogo: na build de release ela nao existe. O arquivo so entra na lista de
+# fontes na configuracao Debug, e JOGO_DEBUG e o que apaga o gancho do F3 em
+# App.cpp -- assim o release nao carrega nem o codigo nem a tecla.
+target_sources(jogo PRIVATE $<$<CONFIG:Debug>:src/scenes/DebugScene.cpp>)
+target_compile_definitions(jogo PRIVATE $<$<CONFIG:Debug>:JOGO_DEBUG>)
+
 # Caminho de assets usado quando o executavel roda de dentro de build/ (dev).
 # Em uma instalacao, os assets ficam ao lado do binario e tem prioridade.
 target_compile_definitions(jogo PRIVATE

@@ -54,6 +54,11 @@ janela do jogo perde o foco e as teclas vão parar em outra aplicação do usuá
 Para exercitar uma cena específica, aponte `main.cpp` para ela num build
 temporário e reverta depois.
 
+Com o jogo na frente, **F3 abre a tela de depuração** (só no build debug,
+`src/scenes/DebugScene.*`): quadros por segundo, drivers de vídeo e áudio,
+renderer, tamanho da janela, de onde os assets estão vindo e o estado da nave.
+É o painel de instrumentos, não uma medição determinística.
+
 Para o áudio existe o equivalente: o driver `disk` do SDL grava o PCM cru em vez
 de tocar, e aí o som vira número.
 
@@ -85,13 +90,13 @@ no laço, preserve essa relação.
 campo de rochas, colisão, integridade do casco e o ambiente sonoro, e vive na
 `InteriorScene` — a nave continua voando enquanto o piloto anda lá dentro. Quem
 chama `Flight::atualizar` é a cena ativa: a `FlightScene` com o comando do
-jogador, a `InteriorScene` e a `StatusScene` com `Comando{}` (piloto automático,
-sem código extra: sem entrada tudo tende a seguir reto). Toda cena que bloqueia
-o update de quem está embaixo herda a obrigação de dar o passo do voo, e por
-isso ele avança **exatamente um passo por passo fixo** nos três casos — se mexer
-nisso, confira que continua assim. A `FlightScene` guarda uma referência para o `Flight` da
-cena de baixo; isso é seguro porque a pilha só desempilha do topo, então o
-interior sempre sobrevive à cabine.
+jogador, a `InteriorScene`, a `StatusScene` e a `DebugScene` com `Comando{}`
+(piloto automático, sem código extra: sem entrada tudo tende a seguir reto).
+Toda cena que bloqueia o update de quem está embaixo herda a obrigação de dar o
+passo do voo, e por isso ele avança **exatamente um passo por passo fixo** nos
+quatro casos — se mexer nisso, confira que continua assim. A `FlightScene`
+guarda uma referência para o `Flight` da cena de baixo; isso é seguro porque a
+pilha só desempilha do topo, então o interior sempre sobrevive à cabine.
 
 **O fim da nave.** Cada batida tira 0,125 do casco; `Flight::destruida()` é
 `casco() <= 0`, e não um segundo estado a manter em dia. A partir daí o `Flight`

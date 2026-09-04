@@ -883,6 +883,12 @@ chama `Flight::atualizar` em cada passo. O voo avança **exatamente um passo por
 passo fixo** nos dois casos, e é isso que faz a passagem entre o convés e a
 cabine não ter buraco nem repetição. Se mexer nisso, confira que continua assim.
 
+Daí sai uma regra que vale para toda cena nova: **quem bloqueia o update de quem
+está embaixo herda a obrigação de dar o passo do voo**. É por isso que a
+`StatusScene` e a `DebugScene` também chamam `Flight::atualizar` com `Comando{}`
+enquanto estão no topo (seção 13) — congelar a tela de baixo não pode congelar a
+viagem, nem fazê-la andar duas vezes no mesmo passo.
+
 O que acontece em um passo:
 
 - **Manobra.** A guinada (*yaw*) responde direto ao eixo horizontal; o
@@ -1120,6 +1126,61 @@ encerra a viagem de fato é o `aoSair` da `InteriorScene`, que apaga o ambiente.
 Ela também **ignora as teclas enquanto a cortina ainda está abrindo**: a tecla
 que o jogador estava segurando quando a nave se abriu não pode pular o fim.
 
+### DebugScene — a tela de depuração (só no build debug)
+
+Arquivo: [`src/scenes/DebugScene.cpp`](../src/scenes/DebugScene.cpp).
+
+**F3** abre (e fecha) de qualquer lugar do jogo uma tela que não é do jogo: ela
+mostra o que nenhum HUD mostra, em três blocos.
+
+- **Desempenho**: quadros por segundo e quanto dura um quadro em milissegundos,
+  a frequência do passo fixo e o `alpha` do quadro que está sendo desenhado, o
+  estado do vsync e quantas cenas há na pilha.
+- **Onde está rodando**: o sistema, quantos núcleos e quanta memória a máquina
+  tem, a versão do SDL, o driver de vídeo e o de áudio em uso, o nome do
+  renderer, o tamanho real da janela ao lado da resolução lógica, o volume, se
+  há gamepad, e — embaixo, em largura inteira — de que diretório os assets estão
+  sendo lidos e onde ficam as preferências. Cada uma dessas linhas já foi, um
+  dia, uma hipótese errada sobre a máquina de alguém.
+- **Nave**: a integridade do casco (em porcentagem e no valor cru com que o
+  código a compara), se ela está em cruzeiro, em turbo ou destruída, velocidade,
+  o decaimento da última batida, posição, rumo em graus e o campo de rochas.
+  Fora de uma viagem — no menu — o bloco diz que não há viagem em curso.
+
+Quatro decisões, e o motivo de cada uma.
+
+**Ela só existe no build de depuração.** O `.cpp` entra na lista de fontes do
+CMake dentro de `$<$<CONFIG:Debug>:...>`, e o gancho do F3 em `App.cpp` fica
+atrás de `#ifdef JOGO_DEBUG` — a mesma configuração define as duas coisas. No
+build `release` não há nem o código nem a tecla; é uma ferramenta de quem
+desenvolve, não uma tela do jogo.
+
+**O F3 é tratado pelo `App`, junto do F11, e não por uma cena.** Ele precisa
+funcionar *de qualquer lugar*, inclusive de cenas que ignoram a entrada — o menu
+não lê F3, e durante uma cortina ninguém lê tecla nenhuma. E ele não é uma
+`Acao` do `Input`: as ações são os controles do jogo, que o jogador pode
+remapear no `config.ini`; a tecla de uma ferramenta não é um controle do jogo.
+
+**Quem sabe se a tela está aberta é a própria pilha.** `DebugScene::alternar()`
+olha se o topo é uma `DebugScene` (com um `dynamic_cast`) e desempilha, ou
+empilha uma nova. Guardar um `bool debugAberta_` no `App` seria uma segunda
+verdade para manter em dia — a mesma razão pela qual `Flight::destruida()` é
+`casco() <= 0` e não um estado à parte.
+
+**Ela congela quem está embaixo, e por isso dá o passo do voo.** É um overlay
+como a `PauseScene`, com `bloqueiaRender()` em `false` — a cena de onde o painel
+foi aberto continua aparecendo, apagada, atrás dele. Mas bloquear o update
+carrega a obrigação da seção 12: enquanto está no topo, é a `DebugScene` que
+chama `Flight::atualizar` com `Comando{}`, uma vez por passo fixo, para a viagem
+não parar nem andar duas vezes. Como ela não é dona de voo nenhum, procura o
+`Flight` percorrendo a pilha de cima para baixo até achar a `InteriorScene` — e
+aceita não achar: no menu ainda não há viagem.
+
+Uma consequência boa dessa última decisão: o casco pode ceder com o painel
+aberto, e a `DebugScene` não precisa saber disso. Quem entrega a vista externa é
+a cena de baixo, olhando `Flight::destruida()` — que é estado, e não um aviso que
+se perde — no primeiro passo depois que o painel sair da frente.
+
 ### A cortina entre o convés e a cabine
 
 Arquivo: [`src/scenes/Transicao.cpp`](../src/scenes/Transicao.cpp).
@@ -1329,6 +1390,13 @@ O arquivo sai no formato do dispositivo (S16LE estéreo a 44100 Hz) e pode ser
 medido com qualquer script. É o equivalente sonoro do screenshot: foi assim que
 o loop do ambiente, os fades e o abafamento do casco foram conferidos.
 
+**Perguntar ao próprio jogo.** As três acima são para conferir uma mudança; esta
+é para quando o programa está na sua frente e algo não bate. No build de
+depuração, **F3** abre a tela de depuração de qualquer lugar (seção 13): é onde
+se descobre que o renderer não é o que se imaginava, que os assets estão vindo de
+uma cópia velha ao lado de outro binário, ou que o casco já estava em 50% antes
+do teste começar. Ela não é determinística — é o painel de instrumentos.
+
 Nada de "está suave" ou "está audível": **RMS** por janela de tempo para volume
 percebido, diferença amostra a amostra na virada do loop comparada com a média do
 sinal para provar que a emenda não estala, deslocamento em pixels entre dois
@@ -1365,6 +1433,7 @@ mudança vai no corpo da mensagem de commit.
 | **Atlas** | Uma imagem com vários desenhos lado a lado, dos quais se recorta um por vez. |
 | **Back-face culling** | Descartar as faces que apontam para o lado oposto ao da câmera. |
 | **Borda (entrada)** | O instante em que uma tecla passa de solta a pressionada (ou o contrário). |
+| **Build de depuração / release** | As duas configurações de compilação: a de depuração guarda informação para inspecionar o programa e não otimiza; a de release otimiza e deixa de fora o que só serve a quem desenvolve (aqui, a tela do F3). |
 | **Cena** | Uma tela do jogo (menu, convés, cabine, pausa), que vive na pilha de cenas. |
 | **Clipe (animação)** | Uma linha da folha de sprites tocada como sequência: quantos quadros e a que ritmo. |
 | **Cortina (transição)** | Retângulo de cor que cobre a tela para emendar duas cenas sem corte. |

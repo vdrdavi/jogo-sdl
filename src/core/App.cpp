@@ -4,6 +4,13 @@
 
 #include "core/Log.hpp"
 
+// A tela de depuracao so e compilada na build de depuracao (veja o
+// CMakeLists.txt): fora dela o arquivo nem entra na lista de fontes, e o F3
+// abaixo nao existe.
+#ifdef JOGO_DEBUG
+#include "scenes/DebugScene.hpp"
+#endif
+
 namespace jogo {
 
 App::~App() {
@@ -115,6 +122,16 @@ void App::processarEventos(Context& ctx) {
                 if (evento.key.scancode == SDL_SCANCODE_F11 && !evento.key.repeat) {
                     alternarTelaCheia();
                 }
+#ifdef JOGO_DEBUG
+                // O F3 vive aqui, e nao em uma cena, porque a tela de depuracao
+                // abre de qualquer lugar do jogo -- inclusive de cenas que
+                // ignoram a entrada, como o menu durante uma cortina. E ele nao
+                // e uma Acao do Input: nao e um controle do jogo para o jogador
+                // remapear, e sim uma tecla da ferramenta.
+                if (evento.key.scancode == SDL_SCANCODE_F3 && !evento.key.repeat) {
+                    DebugScene::alternar(cenas_);
+                }
+#endif
                 break;
             default:
                 break;
