@@ -1,31 +1,30 @@
 ---
-description: Compila o jogo no preset release e abre a janela do jogo. Use quando o usuario pedir para rodar, abrir ou buildar o jogo em release (otimizado), conferir desempenho, ou validar o binario que vai para instalacao.
+name: rodar-debug
+description: Compila o jogo no preset debug e abre a janela do jogo. Use quando o usuario pedir para rodar, abrir, testar ou buildar o jogo em debug (com assercoes e simbolos), ou disser apenas "roda o jogo" durante um trabalho de depuracao.
 allowed-tools: Bash, Read, Glob, Grep
 model: haiku
 effort: low
 ---
 
-# Rodar o jogo em release
+# Rodar o jogo em debug
 
-Compila com o preset `release` (`CMAKE_BUILD_TYPE=Release`, otimizado, sem
-simbolos de depuracao) e abre a janela do jogo na sessao grafica do usuario.
-E esta a build que representa o que o jogador final recebe.
+Compila com o preset `debug` (`CMAKE_BUILD_TYPE=Debug`, sem otimizacao, com
+simbolos) e abre a janela do jogo na sessao grafica do usuario.
 
 ## Passos
 
 1. Configure e compile, sempre a partir da raiz do projeto:
 
    ```sh
-   cmake --preset release && cmake --build build/release
+   cmake --preset debug && cmake --build build/debug
    ```
 
    O `cmake --preset` e barato quando o cache ja existe, entao rode os dois
    sempre — e ele que pega `CMakeLists.txt` novo (arquivo `.cpp` adicionado, por
    exemplo).
 
-2. Se o build falhar, **pare aqui**. Release pega coisa que debug deixa passar
-   (uso de variavel nao inicializada, warning que so aparece com otimizacao) —
-   trate como resultado, nao como ruido.
+2. Se o build falhar, **pare aqui**. Nao rode um binario velho fingindo que a
+   mudanca foi testada.
 
    Nao conserte o codigo por conta propria: quem mexe no C++ aqui e o modelo
    da sessao, nao o modelo leve que roda esta skill. Mostre a saida do
@@ -38,7 +37,7 @@ E esta a build que representa o que o jogador final recebe.
 4. Abra o jogo em segundo plano, para nao travar a sessao:
 
    ```sh
-   ./build/release/jogo
+   ./build/debug/jogo
    ```
 
    Use `run_in_background: true` no Bash. A janela abre na sessao grafica do
@@ -48,23 +47,13 @@ E esta a build que representa o que o jogador final recebe.
 ## Detalhes que evitam retrabalho
 
 - **Nunca** rode com `SDL_VIDEODRIVER=dummy` aqui: o pedido e abrir o jogo de
-  verdade. O driver dummy so serve para fumaca sem sessao grafica:
-
-  ```sh
-  SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ./build/release/jogo
-  ```
-
-  Use isso apenas se o usuario pedir explicitamente uma checagem sem janela — e
-  mate o processo depois de alguns segundos.
+  verdade. O driver dummy so serve para fumaca sem sessao grafica.
 - Nao tente injetar teclas (ydotool e afins) para "dirigir" o jogo: a janela
   perde o foco e as teclas vao parar em outra aplicacao do usuario. Quem joga e
   ele.
-- Release e a build que se instala. Se o usuario pedir o pacote instalado em vez
-  da janela:
-
-  ```sh
-  cmake --install build/release --prefix <dir>
-  ```
-
+- Para conferir uma tela especifica sem depender do usuario, o caminho
+  deterministico e o patch temporario com `SDL_RenderReadPixels` + `SDL_SavePNG`
+  descrito no `CLAUDE.md` — marque com `// TEMP` e confira com
+  `grep -rn "TEMP" src/` antes de qualquer commit.
 - Se o jogo em segundo plano terminar sozinho logo depois de abrir, leia a saida
   do processo: costuma ser asset faltando ou falha ao criar janela/audio.
